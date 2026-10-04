@@ -4,6 +4,7 @@ import cn.shijiu.vwhisper.TomlLite;
 import cn.shijiu.vwhisper.VWhisper;
 import cn.shijiu.vwhisper.WhisperService;
 import cn.shijiu.vwhisper.command.MsgCommand;
+import cn.shijiu.vwhisper.command.RootCommand;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand.Invocation;
 import com.velocitypowered.api.permission.Tristate;
@@ -422,12 +423,50 @@ public class ServiceTest {
         check("   并且一个字都没发出去", !bob.saw("嗨"));
         alice.clear();
         new MsgCommand(plugin).execute(invocation(alice.source, "Bob"));
-        check("有权限但参数不够时给用法提示", alice.saw("/msg"));
+        check("有权限但参数不够时给用法提示", alice.saw("/vw msg"));
         reconfig(defaultOverrides());
 
         // ---- 10. Tab 补全 ----
         final List<String> suggestions = new MsgCommand(plugin).suggest(invocation(alice.source, "b"));
-        check("/msg 的 Tab 补全给出在线玩家", suggestions.contains("Bob"));
+        check("/vw msg 的 Tab 补全给出在线玩家", suggestions.contains("Bob"));
+
+        // ---- 11. 统一入口 /vw <子命令> ----
+        final RootCommand root = new RootCommand(plugin);
+        alice.clear();
+        bob.clear();
+        root.execute(invocation(alice.source, "msg", "Bob", "走子命令"));
+        check("/vw msg 真的发得出去", bob.saw("Alice→我: 走子命令"));
+        check("  并且发送者自己看到回显", alice.saw("我→Bob: 走子命令"));
+
+        alice.clear();
+        bob.clear();
+        root.execute(invocation(alice.source, "m", "Bob", "走别名"));
+        check("/vw m（msg 的别名）也能发", bob.saw("Alice→我: 走别名"));
+
+        alice.clear();
+        bob.clear();
+        root.execute(invocation(alice.source, "r", "回一下"));
+        check("/vw r（reply 的别名）能回复", bob.saw("Alice→我: 回一下"));
+
+        alice.clear();
+        root.execute(invocation(alice.source, "nonsense"));
+        check("不存在的子命令给提示", alice.saw("没有") && alice.saw("nonsense"));
+
+        alice.clear();
+        root.execute(invocation(alice.source));
+        check("不带参数给帮助", alice.saw("VWhisper") && alice.saw("/vw msg"));
+        check("帮助里不含没权限的子命令", !alice.saw("/vw spy"));
+        alice.clear();
+        root.execute(invocation(alice.source, "help"));
+        check("/vw help 也是帮助", alice.saw("/vw msg"));
+
+        final List<String> subs = root.suggest(invocation(alice.source, ""));
+        check("补全给出子命令名", subs.contains("msg") && subs.contains("reply"));
+        check("补全也给出子命令别名", subs.contains("m") && subs.contains("r"));
+        check("没权限的子命令不进补全", !subs.contains("spy"));
+
+        final List<String> delegated = root.suggest(invocation(alice.source, "msg", "b"));
+        check("子命令名之后交给子命令补全", delegated.contains("Bob"));
 
         System.out.println();
         if (failures.isEmpty()) {

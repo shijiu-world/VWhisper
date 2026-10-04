@@ -25,7 +25,8 @@ public class SmokeTest {
 
         check("分节 key 带前缀：servers.mode", "blacklist".equals(TomlLite.string(map, "servers.mode", "?")));
         check("默认格式串读得到", ((String) TomlLite.string(map, "format.sender", "")).contains("#target#"));
-        check("命令别名是数组", ((List<?>) map.get("commands.msg")).contains("w"));
+        check("子命令别名是数组", ((List<?>) map.get("commands.msg")).contains("w"));
+        check("主命令别名默认 vw", ((List<?>) map.get("commands.root")).contains("vw"));
         check("布尔值", TomlLite.bool(map, "sound.enabled", false));
         check("小数", TomlLite.decimal(map, "sound.volume", 0D) == 1.0D);
         check("带引号的中文提示语", ((String) map.get("messages.prefix")).contains("私聊"));
@@ -74,6 +75,9 @@ public class SmokeTest {
         check("jar 内置默认配置可用", defaults.formatReceiver().contains("#sender#"));
         check("默认颜色模式是 keep", "keep".equals(defaults.colorMode()));
         check("默认允许所有人发私聊", defaults.allowByDefault());
+        check("默认主命令别名是 vw", defaults.rootAliases().contains("vw"));
+        check("提示语里的 #label# 换成实际命令名", defaults.label().equals("/vw"));
+        check("子命令别名表里没有 root", !defaults.subAliases().containsKey("root"));
         check("提示语自动拼 prefix", defaults.message("self-message").startsWith("&8[&b私聊&8]&r"));
         check("提示语缺配置时有兜底", defaults.message("根本没这个键").contains("messages.根本没这个键"));
 

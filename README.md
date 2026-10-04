@@ -21,21 +21,35 @@
 
 1. `vwhisper-1.0.0.jar` 丢进代理的 `plugins/` 目录
 2. 启动代理一次，会自动生成 `plugins/vwhisper/config.toml`
-3. 改完配置用 `/vwhisper reload`（控制台直接敲也行）
+3. 改完配置用 `/vw reload`（控制台直接敲也行）
 
 ## 命令
 
-| 命令 | 别名 | 说明 |
-| --- | --- | --- |
-| `/msg <玩家> <消息>` | `tell` `w` `m` `pm` `whisper` | 发私聊 |
-| `/reply <消息>` | `r` | 回复最近跟自己聊过的人（两边都能接着回） |
-| `/msgtoggle [on\|off]` | `togglemsg` `tmsg` | 开关接收私聊 |
-| `/ignore <玩家>` | — | 屏蔽 / 取消屏蔽 |
-| `/spy [on\|off]` | `socialspy` `msgspy` | 私聊窥屏 |
-| `/vwhisper <reload\|help\|version>` | `VWhisper` `vws` | 管理命令 |
+整个插件只有一个命令入口：**`/vwhisper`**，默认别名 **`/vw`**。剩下全是它的子命令：
 
-别名都可以在 `config.toml` 的 `[commands]` 里改 —— 跟别的插件抢命令名时把那个别名删掉即可。
-主命令名固定且小写（Velocity 底层 Brigadier 的 literal 节点大小写敏感，注册大写会导致敲小写时报"命令不存在"）。
+| 命令 | 子命令别名 | 说明 |
+| --- | --- | --- |
+| `/vw msg <玩家> <消息>` | `m` `pm` `tell` `w` `whisper` | 发私聊（跨服，人在哪个服都收得到） |
+| `/vw reply <消息>` | `r` | 回复最近跟自己聊过的人（两边都能接着回） |
+| `/vw toggle [on\|off]` | `msgtoggle` `togglemsg` `tmsg` | 开关接收私聊 |
+| `/vw ignore <玩家>` | — | 屏蔽 / 取消屏蔽 |
+| `/vw spy [on\|off]` | `socialspy` `msgspy` | 私聊窥屏 |
+| `/vw reload` | `rl` | 重载配置 |
+| `/vw version` | `info` `ver` | 显示版本 |
+| `/vw help` | `?` | 看这个列表（不带参数敲 `/vw` 也一样） |
+
+主命令的别名和每个子命令的别名都在 `config.toml` 的 `[commands]` 里改：
+
+```toml
+[commands]
+root = ["vw"]                       # 想叫别的就改这里；写 [] 就只用 /vwhisper
+msg = ["m", "pm", "tell", "w", "whisper"]
+```
+
+这么设计是因为代理上同一个命令名只能注册一次 —— 全收进一个入口后只占一个名字，
+不会跟别的插件抢 `/msg`、`/w`，也不会误伤后端子服自己的命令（比如 CMI 的 `/msg` 照常归它自己）。
+⚠️ 主命令名固定小写：Velocity 底层 Brigadier 的 literal 节点大小写敏感，
+注册成大写会导致敲小写时报"命令不存在"。
 
 ## 权限节点
 
@@ -45,10 +59,13 @@
 
 | 权限 | 作用 |
 | --- | --- |
-| `vwhisper.msg` | 用 `/msg` |
-| `vwhisper.reply` | 用 `/reply` |
-| `vwhisper.toggle` | 用 `/msgtoggle` |
-| `vwhisper.ignore` | 用 `/ignore` |
+| `vwhisper.msg` | 用 `/vw msg` |
+| `vwhisper.reply` | 用 `/vw reply` |
+| `vwhisper.toggle` | 用 `/vw toggle` |
+| `vwhisper.ignore` | 用 `/vw ignore` |
+
+> 没权限的人敲命令看到的也是提示（"你没权限"），不是"命令不存在"；
+> 帮助列表和 Tab 补全里也只会显示他真的能用的子命令。
 
 **特权节点** —— 必须显式给，`allow-by-default` 对它们无效：
 
@@ -80,6 +97,8 @@ LuckPerms 里通常这么给：
 | `#sender-server#` `#target-server#` | 所在服（控制台发出去时是 `console`） |
 | `#message#` | 消息内容，**一定放最后** |
 
+`[messages]` 里的提示语还能用 `#label#`，会换成实际的命令名（`/vw`）—— 改了别名不用逐条改文本。
+
 > 没有称号/前缀/`%xxx%` 之类的占位符：私聊是代理绕过子服直接发的，子服的 PlaceholderAPI
 > 变量在代理端拿不到，硬要就要额外装 PAPIProxyBridge 并多一次跨服往返 —— 不值。
 > 想让称号出现在聊天里是子服那边 `Chat.GeneralFormat` 的事，这里不掺和。
@@ -95,7 +114,8 @@ LuckPerms 里通常这么给：
 
 ## 已知边界
 
-- `/reply` 的记忆只在内存里，代理重启就清空；对方下线也回不了。
+- `/vw reply` 的记忆只在内存里，代理重启就清空；对方下线也回不了。
+- 命令别名改了之后不会自动生效 —— 命令是在起服时注册的，改名要重启代理（配置本身可以 `/vw reload` 热更新）。
 - 屏蔽名单和接收开关存在 `plugins/vwhisper/` 下的两个纯文本文件里（一行一条 UUID，肉眼可读）；
   **窥屏状态故意不落盘** —— 重启自动关，免得忘了关还在看别人的私聊。
 - 冷却也是内存态，重启清零。

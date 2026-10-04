@@ -12,12 +12,7 @@ import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
-import cn.shijiu.vwhisper.command.AdminCommand;
-import cn.shijiu.vwhisper.command.IgnoreCommand;
-import cn.shijiu.vwhisper.command.MsgCommand;
-import cn.shijiu.vwhisper.command.ReplyCommand;
-import cn.shijiu.vwhisper.command.SpyCommand;
-import cn.shijiu.vwhisper.command.ToggleCommand;
+import cn.shijiu.vwhisper.command.RootCommand;
 import org.slf4j.Logger;
 
 import java.nio.file.Files;
@@ -72,7 +67,8 @@ public final class VWhisper {
         registerCommands();
         startAutoReload();
 
-        logger.info("[vwhisper] VWhisper 已就绪 —— 跨服私聊开着，/msg 走代理直达，子服不用装东西。");
+        logger.info("[vwhisper] VWhisper 已就绪 —— 跨服私聊开着，命令 " + config.label()
+                + " msg（别名可在 [commands] 里改）。子服不用装任何东西。");
     }
 
     /** 有人下线：把 /reply 记忆、窥屏状态都清掉，别占着内存也别留下"还能回复"的假象。 */
@@ -86,15 +82,13 @@ public final class VWhisper {
     // 命令
     // ------------------------------------------------------------------
 
-    /** 别名全部来自 config.toml 的 [commands] —— 跟别的插件抢名字时删掉对应的那个就行。 */
+    /**
+     * 只注册一个命令：{@code /vwhisper}，别名（默认 {@code /vw}）来自 config.toml 的
+     * {@code [commands] root}。私聊、屏蔽、窥屏、重载全是它的子命令 —— 这样代理上只占一个
+     * 命令名，不会跟别的插件抢 /msg、/w 之类，也不会误伤后端子服自己的命令。
+     */
     private void registerCommands() {
-        final Configuration current = config;
-        register("vwhisper", new AdminCommand(this), current.adminAliases());
-        register("msg", new MsgCommand(this), current.msgAliases());
-        register("reply", new ReplyCommand(this), current.replyAliases());
-        register("msgtoggle", new ToggleCommand(this), current.toggleAliases());
-        register("ignore", new IgnoreCommand(this), current.ignoreAliases());
-        register("spy", new SpyCommand(this), current.spyAliases());
+        register("vwhisper", new RootCommand(this), config.rootAliases());
     }
 
     private void register(final String name, final SimpleCommand command, final List<String> aliases) {

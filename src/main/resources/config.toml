@@ -63,9 +63,10 @@ console = "&8[&c控制台 &8→ &7我&8]&r #message#"
 prefix = "&8[&b私聊&8]&r"
 no-permission = "&c你没有权限这么做（缺 #permission#）。"
 players-only = "&c这条命令只有玩家能用。"
-usage-msg = "&7用法：&f/msg <玩家> <消息>"
-usage-reply = "&7用法：&f/reply <消息>"
-usage-ignore = "&7用法：&f/ignore <玩家>"
+usage-msg = "&7用法：&f#label# msg <玩家> <消息>"
+usage-reply = "&7用法：&f#label# reply <消息>"
+usage-ignore = "&7用法：&f#label# ignore <玩家>"
+unknown-subcommand = "&c没有 &7#sub# &c这个子命令，敲 &f#label# help &c看列表。"
 player-not-found = "&c找不到在线玩家 &7#target#&c。"
 ambiguous-target = "&7#target# &c有多个人名匹配，多打几个字。"
 self-message = "&c不能给自己发私聊。"
@@ -113,19 +114,25 @@ save-ignores = true
 save-toggles = true
 
 # ------------------------------------------------------------
-# 命令别名
-#   这里写的是别名，主命令名固定（/msg /reply /msgtoggle /ignore /spy /vwhisper）。
-#   ⚠️ Velocity 上同一个名字只能注册一次 —— 如果别的插件也抢了 /w、/m 这种短命令，
-#      起服时会看到冲突提示，把那个别名从这里删掉即可。
-#   写空 list = [] 就是不给别名（主命令还在）。
+# 命令名与别名
+#   整个插件只有一个命令入口：/vwhisper。私聊、屏蔽、窥屏、重载全是它的子命令：
+#     /vw msg <玩家> <消息>    /vw reply <消息>    /vw toggle [on|off]
+#     /vw ignore <玩家>        /vw spy [on|off]    /vw reload
+#     /vw help                 /vw version
+#   root = 主命令 /vwhisper 的别名（想叫 /vw 之外的名字就改这里，写 [] 就只用 /vwhisper）
+#   下面每一行是「子命令主名 = [别名...]」，别名是 /vw 后面敲的那个词，
+#   不参与 Velocity 的命令注册，所以跟别的插件撞名也没事。
 # ------------------------------------------------------------
 [commands]
-msg = ["tell", "w", "m", "pm", "whisper"]
+root = ["vw"]
+msg = ["m", "pm", "tell", "w", "whisper"]
 reply = ["r"]
-msgtoggle = ["togglemsg", "tmsg"]
+toggle = ["msgtoggle", "togglemsg", "tmsg"]
 ignore = []
 spy = ["socialspy", "msgspy"]
-vwhisper = ["VWhisper", "vws"]
+reload = ["rl"]
+version = ["info", "ver"]
+help = ["?"]
 
 # ------------------------------------------------------------
 # 杂项

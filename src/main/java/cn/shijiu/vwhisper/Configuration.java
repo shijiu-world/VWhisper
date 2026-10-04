@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -68,12 +67,10 @@ public final class Configuration {
     private final boolean autoReload;
     private final int autoReloadIntervalSeconds;
     private final boolean logToConsole;
-    private final List<String> msgAliases;
-    private final List<String> replyAliases;
-    private final List<String> toggleAliases;
-    private final List<String> ignoreAliases;
-    private final List<String> spyAliases;
-    private final List<String> adminAliases;
+    /** 主命令 /vwhisper 的别名（默认 ["vw"]）。 */
+    private final List<String> rootAliases;
+    /** 子命令别名：子命令主名 -> 别名列表（在 /vw 后面敲的那个词）。 */
+    private final Map<String, List<String>> subAliases;
 
     private Configuration(final Map<String, Object> m) {
         this.filter = new ServerFilter(
@@ -117,23 +114,18 @@ public final class Configuration {
                 (int) Math.max(1L, TomlLite.integer(m, "advanced.auto-reload-interval-seconds", 3L));
         this.logToConsole = TomlLite.bool(m, "advanced.log-to-console", true);
 
-        this.msgAliases = aliases(m, "commands.msg", "tell", "w", "m", "pm", "whisper");
-        this.replyAliases = aliases(m, "commands.reply", "r");
-        this.toggleAliases = aliases(m, "commands.msgtoggle", "togglemsg", "tmsg");
-        this.ignoreAliases = aliases(m, "commands.ignore");
-        this.spyAliases = aliases(m, "commands.spy", "socialspy", "msgspy");
-        this.adminAliases = aliases(m, "commands.vwhisper", "VWhisper", "vws");
-    }
-
-    /** 别名：配了就用配置里的（可以写空数组=不给别名），没配才用默认值。 */
-    private static List<String> aliases(final Map<String, Object> m, final String key, final String... fallback) {
-        final Object value = m.get(key);
-        if (value instanceof List) {
-            @SuppressWarnings("unchecked")
-            final List<String> list = new ArrayList<>((List<String>) value);
-            return list;
+        // [commands] 段：root 是主命令的别名，其余每个键都是「子命令主名 = [别名...]」
+        final Map<String, List<String>> commands = new LinkedHashMap<>();
+        for (final Map.Entry<String, Object> e : m.entrySet()) {
+            if (e.getKey().startsWith("commands.") && e.getValue() instanceof List) {
+                @SuppressWarnings("unchecked")
+                final List<String> list = new ArrayList<>((List<String>) e.getValue());
+                commands.put(e.getKey().substring("commands.".length()), list);
+            }
         }
-        return Arrays.asList(fallback);
+        final List<String> root = commands.remove("root");
+        this.rootAliases = root == null ? Collections.singletonList("vw") : root;
+        this.subAliases = Collections.unmodifiableMap(commands);
     }
 
     // ------------------------------------------------------------------
@@ -223,10 +215,20 @@ public final class Configuration {
         if (text == null) {
             text = "&c(缺少配置项 messages." + key + ")";
         }
+        // #label# 自动填成实际命令名（/vw 之类）—— 改了别名提示语也跟着变，不用逐个改
+        if (text.contains("#label#")) {
+            text = text.replace("#label#", label());
+        }
         for (int i = 0; i + 1 < args.length; i += 2) {
             text = text.replace("#" + args[i] + "#", String.valueOf(args[i + 1]));
         }
         return prefix + text;
+    }
+
+    /** 提示语里显示成什么命令名 —— 取配置的第一个主命令别名，没配就用 /vwhisper。 */
+    public String label() {
+        final String first = rootAliases.isEmpty() ? null : rootAliases.get(0);
+        return "/" + (first == null || first.isEmpty() ? "vwhisper" : first);
     }
 
     /** 不带 prefix 的原始提示语 —— 少数场景（比如要拼换行）用。 */
@@ -275,28 +277,14 @@ public final class Configuration {
         return logToConsole;
     }
 
-    public List<String> msgAliases() {
-        return msgAliases;
+    /** 主命令 /vwhisper 的别名（默认 ["vw"]）；写空 list 就只用 /vwhisper。 */
+    public List<String> rootAliases() {
+        return rootAliases;
     }
 
-    public List<String> replyAliases() {
-        return replyAliases;
-    }
-
-    public List<String> toggleAliases() {
-        return toggleAliases;
-    }
-
-    public List<String> ignoreAliases() {
-        return ignoreAliases;
-    }
-
-    public List<String> spyAliases() {
-        return spyAliases;
-    }
-
-    public List<String> adminAliases() {
-        return adminAliases;
+    /** 子命令别名表：键是子命令主名（msg / reply / …），值是在 /vw 后面能用的别名。 */
+    public Map<String, List<String>> subAliases() {
+        return subAliases;
     }
 
     // ------------------------------------------------------------------
