@@ -35,7 +35,7 @@ allow-by-default = true
 # ⚠️ 渐变不单独设权限 —— 能用颜色就能用渐变。
 # ------------------------------------------------------------
 [colors]
-mode = "keep"
+mode = "parse"
 
 # ------------------------------------------------------------
 # 消息格式
@@ -51,7 +51,7 @@ mode = "keep"
 minimessage = false
 sender = "&8[&7我 &8→ &7#target#&8]&r #message#"
 receiver = "&8[&7#sender# &8→ &7我&8]&r #message#"
-spy = "&8[&cSpy&8] &7#sender# &8→ &7#target#&8:&r #message#"
+spy = "&8[&7#sender# &8→ &7#target#&8]&r #message#"
 # 从控制台发出的那一份（发给玩家看的）
 console = "&8[&c控制台 &8→ &7我&8]&r #message#"
 
@@ -60,33 +60,33 @@ console = "&8[&c控制台 &8→ &7我&8]&r #message#"
 # 每条前面会自动拼上下面的 prefix
 # ------------------------------------------------------------
 [messages]
-prefix = "&8[&b私聊&8]&r"
-no-permission = "&c你没有权限这么做（缺 #permission#）。"
-players-only = "&c这条命令只有玩家能用。"
+prefix = ""
+no-permission = "&c你没有权限这么做"
+players-only = "&c这条命令只有玩家能用"
 # ⚠️ #label# 会自动换成玩家真正敲的那个命令（走 /msg 就是 /msg，走 /vw msg 就是 /vw msg）
 usage-msg = "&7用法：&f#label# <玩家> <消息>"
 usage-reply = "&7用法：&f#label# <消息>"
 usage-ignore = "&7用法：&f#label# <玩家>"
-unknown-subcommand = "&c没有 &7#sub# &c这个子命令，敲 &f#label# help &c看列表。"
-player-not-found = "&c找不到在线玩家 &7#target#&c。"
-ambiguous-target = "&7#target# &c有多个人名匹配，多打几个字。"
-self-message = "&c不能给自己发私聊。"
-target-off = "&7#target# &c关了私聊，消息没有发出去。"
-target-ignored = "&7#target# &c屏蔽了你，消息没有发出去。"
-server-denied = "&c这个服务器不能使用私聊。"
-cooldown = "&c慢一点，还要 &7#seconds# &c秒。"
-no-reply-target = "&c还没有可以回复的人。"
-reply-target-offline = "&c你要回复的人已经下线了。"
-spy-on = "&a已开启私聊窥屏（管理视角）。"
-spy-off = "&a已关闭私聊窥屏。"
-toggle-off = "&a已关闭接收私聊。"
-toggle-on = "&a已恢复接收私聊。"
-ignore-added = "&a已屏蔽 &7#target#&a。"
-ignore-removed = "&a已取消屏蔽 &7#target#&a。"
-ignore-self = "&c不能屏蔽自己。"
-reloaded = "&a配置已重新加载。"
-reload-failed = "&c配置加载失败，用的还是旧配置。原因：#reason#"
-unknown-target-in-past = "&c对方已经不在了。"
+unknown-subcommand = "&c不存在 &7#sub# &c子命令，输入 &f#label# help &c查看命令列表"
+player-not-found = "&c找不到在线玩家 &7#target#&c"
+ambiguous-target = "&7#target# &c有多个人名匹配，多打几个字"
+self-message = "&c不能给自己发私聊"
+target-off = "&6#target# &e关闭私聊，消息没有发出去"
+target-ignored = "&6#target# &e屏蔽了你，消息没有发出去"
+server-denied = "&c此服务器关闭了私聊功能"
+cooldown = "&c慢一点，还要 &7#seconds# &c秒"
+no-reply-target = "&c还没有可以回复的人"
+reply-target-offline = "&c你要回复的人已经下线了"
+spy-on = "&e已开启私聊窥屏"
+spy-off = "&e已关闭私聊窥屏"
+toggle-off = "&e已关闭接收私聊"
+toggle-on = "&e已恢复接收私聊"
+ignore-added = "&e已屏蔽 &6#target#"
+ignore-removed = "&e已取消屏蔽 &6#target#"
+ignore-self = "&c不能屏蔽自己"
+reloaded = "&a配置已重新加载"
+reload-failed = "&c配置加载失败，用的还是旧配置原因：#reason#"
+unknown-target-in-past = "&c对方已经不在了"
 
 # ------------------------------------------------------------
 # 冷却：同一个玩家多久只能发一条（秒）。0 = 不限。
