@@ -81,6 +81,10 @@
    `save-ignores` / `save-toggles` 才是落盘的。
 7. **命令在起服时注册**：改 `[shortcuts]` 或 `[commands] root` 要**重启代理**，reload 不管这个。
 8. `hasPermission` 返回 false 时要给「没权限」提示，不要装作命令不存在。
+9. **允许给自己发私聊**（`general.allow-self-message`，默认 `true`）。自聊时的特殊处理都在
+   `WhisperService`：只发一条（用 sender 格式）、不查 toggle/ignore、不写 reply 记忆、不广播 spy。
+   改动前先想清楚这四条——尤其「不写 reply 记忆」，否则自言自语之后 `/r` 会指向自己，
+   把「回复上一个人」这条路堵死。
 
 ---
 
@@ -94,6 +98,7 @@
 | 颜色/渐变语法 | `ChatColors.java` | ⚠️ Vmessage 有一份独立拷贝，两边都要改 |
 | 权限判定 | `Permissions.java` | 注意 `allow-by-default` 只覆盖 4 个基础节点 |
 | 存盘格式 | `Store.java` | 纯文本一行一条 UUID，肉眼可读；改格式要考虑旧文件兼容 |
+| 自聊相关 | `WhisperService.send()` ③⑤⑥ + `deliver()` | 自聊有 4 条特殊规则（见铁律 9），分散在两个方法里，改一处容易漏另一处 |
 
 ---
 
@@ -123,8 +128,8 @@ $out = "D:\tmp\vwtest"
 
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
-| `SmokeTest` | 48 | TOML 解析、颜色/渐变渲染。**必须传 `target/classes/config.toml` 作 `args[0]`** |
-| `ServiceTest` | 49 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全 |
+| `SmokeTest` | 49 | TOML 解析、颜色/渐变渲染。**必须传 `target/classes/config.toml` 作 `args[0]`** |
+| `ServiceTest` | 51 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全 |
 | `ClasspathTest` | 3 | 隔离 ClassLoader 只加载 velocity jar + 本项目 classes，验证工具类可加载，**并反向验证旧写法在同一环境确实挂**（否则这测试是自欺欺人） |
 
 ---

@@ -117,8 +117,9 @@ public final class WhisperService {
             return false;
         }
         final Player target = lookup.player();
-        // ③ 给自己发？算了
-        if (sender != null && target.getUniqueId().equals(sender.getUniqueId())) {
+        // ③ 给自己发？默认允许（当随身便签用），关掉才拦
+        final boolean self = sender != null && target.getUniqueId().equals(sender.getUniqueId());
+        if (self && !config.allowSelfMessage()) {
             plugin.send(source, config.message("self-message"));
             return false;
         }
@@ -127,14 +128,17 @@ public final class WhisperService {
             plugin.send(source, config.message("server-denied"));
             return false;
         }
-        // ⑤ 对方是不是把私聊关了
-        if (!store.isReceiving(target.getUniqueId())
+        // ⑤ 对方是不是把私聊关了。
+        //    自己跟自己说话没有「拒收」这一说，所以 self 时不查（否则关了接收就记事都记不了）
+        if (!self
+                && !store.isReceiving(target.getUniqueId())
                 && !Permissions.has(source, Permissions.TOGGLE_BYPASS, false)) {
             plugin.send(source, config.message("target-off", "target", target.getUsername()));
             return false;
         }
-        // ⑥ 对方是不是屏蔽了我
-        if (sender != null
+        // ⑥ 对方是不是屏蔽了我（同上：自己对自己不算）
+        if (!self
+                && sender != null
                 && store.isIgnoring(target.getUniqueId(), sender.getUniqueId())
                 && !Permissions.has(source, Permissions.IGNORE_BYPASS, false)) {
             plugin.send(source, config.message("target-ignored", "target", target.getUsername()));
@@ -187,23 +191,32 @@ public final class WhisperService {
         final Component toTarget = render(config, sender == null ? config.formatConsole() : config.formatReceiver(),
                 placeholders, message);
 
-        if (sender != null) {
+        // 自言自语：只发一条（用 sender 那套「我 → 我」），不然同一句话会收两遍
+        final boolean self = sender != null && sender.getUniqueId().equals(target.getUniqueId());
+        if (self) {
             sender.sendMessage(toSender);
+        } else {
+            if (sender != null) {
+                sender.sendMessage(toSender);
+            }
+            target.sendMessage(toTarget);
         }
-        target.sendMessage(toTarget);
 
         if (config.soundEnabled()) {
             target.playSound(Sound.sound(Key.key(config.soundName()), Sound.Source.PLAYER,
                     config.soundVolume(), config.soundPitch()));
         }
 
-        // /reply 记忆：双方都记，谁都能接着 /r
-        if (sender != null) {
+        // /reply 记忆：双方都记，谁都能接着 /r。
+        // ⚠️ 自言自语不记 —— 否则 /r 会指向自己，再也回不到上一个真正聊过的人
+        if (sender != null && !self) {
             store.rememberContact(sender.getUniqueId(), target.getUniqueId());
         }
 
-        // 窥屏：把消息转给所有开着 spy 的人，双方不在排除名单才行
-        spyCast(sender, target, config, placeholders, message);
+        // 窥屏：转给所有开着 spy 的人。自己跟自己说话不广播
+        if (!self) {
+            spyCast(sender, target, config, placeholders, message);
+        }
 
         if (config.logToConsole()) {
             logger.info("[vwhisper] " + senderName + " -> " + target.getUsername() + ": "

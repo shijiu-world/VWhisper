@@ -107,6 +107,17 @@ public class ServiceTest {
             return allText().contains(needle);
         }
 
+        /** 收件箱里有几条消息包含 needle —— 用来验证自言自语没被发两遍。 */
+        int count(final String needle) {
+            int n = 0;
+            for (final Component c : inbox) {
+                if (PlainText.of(c).contains(needle)) {
+                    n++;
+                }
+            }
+            return n;
+        }
+
         void clear() {
             inbox.clear();
         }
@@ -326,9 +337,21 @@ public class ServiceTest {
         check("/reply 记忆两边都记着", store.contact(alice.uuid).equals(bob.uuid)
                 && store.contact(bob.uuid).equals(alice.uuid));
 
-        // ---- 2. 给自己发 / 找不到人 ----
+        // ---- 2. 给自己发（默认允许） / 找不到人 ----
         alice.clear();
-        check("不能给自己发", !service.send(alice.source, "Alice", "自言自语") && alice.saw("不能给自己发私聊"));
+        check("能给自己发（默认允许）", service.send(alice.source, "Alice", "自言自语")
+                && alice.saw("自言自语"));
+        alice.clear();
+        check("自言自语只收一条（不会发两遍）", service.send(alice.source, "Alice", "记事")
+                && alice.count("记事") == 1);
+        alice.clear();
+        // 关掉开关后要拦住
+        final Map<String, Object> noSelf = defaultOverrides();
+        noSelf.put("general.allow-self-message", Boolean.FALSE);
+        reconfig(noSelf);
+        check("关掉 allow-self-message 后拦下", !service.send(alice.source, "Alice", "自言自语")
+                && alice.saw("不能给自己发私聊"));
+        reconfig(defaultOverrides());
         alice.clear();
         check("找不到人时不发送", !service.send(alice.source, "Nobody", "喂") && alice.saw("找不到人"));
 
@@ -456,7 +479,7 @@ public class ServiceTest {
 
         alice.clear();
         root.execute(invocation(alice.source, "nonsense"));
-        check("不存在的子命令给提示", alice.saw("没有") && alice.saw("nonsense"));
+        check("不存在的子命令给提示", alice.saw("不存在") && alice.saw("nonsense"));
 
         alice.clear();
         root.execute(invocation(alice.source));

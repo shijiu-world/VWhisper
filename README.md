@@ -130,6 +130,27 @@ LuckPerms 里通常这么给：
 > 变量在代理端拿不到，硬要就要额外装 PAPIProxyBridge 并多一次跨服往返 —— 不值。
 > 想让称号出现在聊天里是子服那边 `Chat.GeneralFormat` 的事，这里不掺和。
 
+## 给自己发私聊（自言自语）
+
+默认**允许** —— `/msg 自己的名字 记点什么` 就能给自己发，当随身便签用（记坐标、记待办）。
+
+开关在 `config.toml`：
+
+```toml
+[general]
+allow-self-message = true    # false = 敲 /msg 自己会提示 messages.self-message
+```
+
+允许时的几条规矩：
+
+| 情况 | 处理 |
+| --- | --- |
+| 收到几条 | **只发一条**（用 `[format].sender` 那套「我 → 我」），不会同一句话收两遍 |
+| 关了接收 / 屏蔽 | 对自己**不算数** —— 自己跟自己说话没有「拒收」这一说 |
+| `/reply` | 不进记忆 —— 自言自语之后敲 `/r` 还是找上一个**真正聊过的人** |
+| 窥屏 | 看不到（自己跟自己说话不广播） |
+| 服务器名单、冷却 | 照旧生效 |
+
 ## 跟本服其它插件的关系
 
 - **和 Vmessage 不冲突**：Vmessage 管公共聊天（跨服频道），VWhisper 管私聊，两者各管一段。
@@ -184,8 +205,8 @@ $out = "D:\tmp\vwtest"
 
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
-| `SmokeTest` | 48 | TOML 解析、颜色/渐变渲染（**要传 `target/classes/config.toml` 作 `args[0]`**） |
-| `ServiceTest` | 49 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全 |
+| `SmokeTest` | 49 | TOML 解析、颜色/渐变渲染（**要传 `target/classes/config.toml` 作 `args[0]`**） |
+| `ServiceTest` | 51 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全 |
 | `ClasspathTest` | 3 | 运行环境校验，见下 |
 
 > `ClasspathTest` 是 `/msg` 一次实机崩溃之后补的。它用一个**只看得见 velocity jar + 本项目 classes**

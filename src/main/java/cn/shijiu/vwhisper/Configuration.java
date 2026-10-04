@@ -57,6 +57,8 @@ public final class Configuration {
     private final String prefix;
     private final Map<String, String> messages;
     // ---------------- 其它 ----------------
+    /** 能不能给自己发私聊（自言自语）。 */
+    private final boolean allowSelfMessage;
     private final long cooldownSeconds;
     private final boolean soundEnabled;
     private final String soundName;
@@ -92,6 +94,8 @@ public final class Configuration {
         this.formatReceiver = TomlLite.string(m, "format.receiver", "&8[&7#sender# &8→ &7我&8]&r #message#");
         this.formatSpy = TomlLite.string(m, "format.spy", "&8[&cSpy&8] &7#sender# &8→ &7#target#&8:&r #message#");
         this.formatConsole = TomlLite.string(m, "format.console", "&8[&c控制台 &8→ &7我&8]&r #message#");
+
+        this.allowSelfMessage = TomlLite.bool(m, "general.allow-self-message", true);
 
         this.prefix = TomlLite.string(m, "messages.prefix", "&8[&b私聊&8]&r");
         final Map<String, String> messages = new LinkedHashMap<>();
@@ -194,6 +198,11 @@ public final class Configuration {
 
     public boolean allowByDefault() {
         return allowByDefault;
+    }
+
+    /** 允不允许给自己发私聊（默认允许）。关掉时敲 /msg 自己会收到 messages.self-message。 */
+    public boolean allowSelfMessage() {
+        return allowSelfMessage;
     }
 
     public String colorMode() {

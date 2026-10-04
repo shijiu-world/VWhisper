@@ -30,8 +30,11 @@ public class SmokeTest {
         check("主命令别名默认 vw", ((List<?>) map.get("commands.root")).contains("vw"));
         check("布尔值", TomlLite.bool(map, "sound.enabled", false));
         check("小数", TomlLite.decimal(map, "sound.volume", 0D) == 1.0D);
-        check("带引号的中文提示语", ((String) map.get("messages.prefix")).contains("私聊"));
-        check("行尾注释不会串进值里", ((String) map.get("messages.no-permission")).endsWith("#permission#）。"));
+        final String selfMsg = TomlLite.string(map, "messages.self-message", "");
+        check("带引号的中文提示语", selfMsg.contains("不能给自己发私聊") && !selfMsg.startsWith("\""));
+        // 行尾注释自己造一段来测 —— 别依赖随包配置里恰好有注释（改文案时容易顺手删掉）
+        final Map<String, Object> commentProbe = TomlLite.parse("tip = \"&c测试\" # 这是注释\n");
+        check("行尾注释不会串进值里", "&c测试".equals(TomlLite.string(commentProbe, "tip", "")));
         check("空数组", ((List<?>) map.get("servers.list")).isEmpty());
         check("渐变不再需要单独权限（配置项已删）", !map.containsKey("colors.gradient-permission"));
 
@@ -74,7 +77,7 @@ public class SmokeTest {
         // ---- 默认配置兜底 ----
         final Configuration defaults = Configuration.defaults();
         check("jar 内置默认配置可用", defaults.formatReceiver().contains("#sender#"));
-        check("默认颜色模式是 keep", "keep".equals(defaults.colorMode()));
+        check("默认颜色模式是 parse", "parse".equals(defaults.colorMode()));
         check("默认允许所有人发私聊", defaults.allowByDefault());
         check("默认主命令别名是 vw", defaults.rootAliases().contains("vw"));
         check("提示语里的 #label# 换成实际命令名", defaults.label().equals("/vw"));
@@ -90,7 +93,9 @@ public class SmokeTest {
         check("拿不到 alias 时退回 /vw msg", defaults.label(null, "msg").equals("/vw msg"));
         check("用法提示里不再写死子命令名", defaults.rawMessage("usage-msg").equals("&7用法：&f#label# <玩家> <消息>"));
         check("子命令别名表里没有 root", !defaults.subAliases().containsKey("root"));
-        check("提示语自动拼 prefix", defaults.message("self-message").startsWith("&8[&b私聊&8]&r"));
+        check("prefix 留空时提示语原样返回", defaults.message("self-message").equals("&c不能给自己发私聊"));
+        check("配了 prefix 就自动拼在前面",
+                new ConfigurationProbe(prefixMap()).unwrap().message("self-message").startsWith("&8[&b私聊&8]&r"));
         check("提示语缺配置时有兜底", defaults.message("根本没这个键").contains("messages.根本没这个键"));
 
         System.out.println();
@@ -137,6 +142,10 @@ public class SmokeTest {
 
     private static Map<String, Object> whitelistMap() {
         return TomlLite.parse("[servers]\nmode = \"whitelist\"\nlist = [\"lobby\"]\n");
+    }
+
+    private static Map<String, Object> prefixMap() {
+        return TomlLite.parse("[messages]\nprefix = \"&8[&b私聊&8]&r\"\nself-message = \"&c不能给自己发私聊\"\n");
     }
 
     private static Map<String, Object> bogusMap() {
