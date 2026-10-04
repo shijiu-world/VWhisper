@@ -174,10 +174,8 @@ public final class WhisperService {
         final Configuration config = plugin.configuration();
         final String mode = Permissions.has(source, Permissions.MSG_COLOR, false)
                 ? "parse" : config.colorMode();
-        final String gradientPermission = config.gradientPermission();
-        final boolean gradientAllowed = gradientPermission.isEmpty()
-                || Permissions.has(source, gradientPermission, false);
-        final Component message = ChatColors.component(mode, raw, gradientAllowed);
+        // 渐变不单独要权限：跟着 mode 走，跟 &c 一个待遇
+        final Component message = ChatColors.component(mode, raw);
 
         final Map<String, String> placeholders = new LinkedHashMap<>();
         final String senderName = sender == null ? ConsoleLabel.NAME : sender.getUsername();

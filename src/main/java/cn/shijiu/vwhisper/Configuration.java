@@ -48,7 +48,6 @@ public final class Configuration {
     // ---------------- 颜色 ----------------
     private final boolean allowByDefault;
     private final String colorMode;
-    private final String gradientPermission;
     // ---------------- 格式 ----------------
     private final boolean miniMessage;
     private final String formatSender;
@@ -88,7 +87,6 @@ public final class Configuration {
             mode = "keep";
         }
         this.colorMode = mode;
-        this.gradientPermission = TomlLite.string(m, "colors.gradient-permission", "vwhisper.msg.gradient").trim();
 
         this.miniMessage = TomlLite.bool(m, "format.minimessage", false);
         this.formatSender = TomlLite.string(m, "format.sender", "&8[&7我 &8→ &7#target#&8]&r #message#");
@@ -193,10 +191,6 @@ public final class Configuration {
 
     public String colorMode() {
         return colorMode;
-    }
-
-    public String gradientPermission() {
-        return gradientPermission;
     }
 
     public boolean miniMessage() {

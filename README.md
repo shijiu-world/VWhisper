@@ -56,8 +56,7 @@
 | --- | --- |
 | `vwhisper.spy` | 窥屏开关 |
 | `vwhisper.reload` | 重载配置 |
-| `vwhisper.msg.color` | 私聊内容里可以用颜色码（`&c`、`&#FF0000`、渐变） |
-| `vwhisper.msg.gradient` | 渐变 `{#FF0000>}文字{#0000FF<}`（可在 `colors.gradient-permission` 里改名） |
+| `vwhisper.msg.color` | 私聊内容里可以用颜色码（`&c`、`&#FF0000`、渐变）—— **渐变不单独设权限** |
 | `vwhisper.spy.bypass` | 自己的私聊不让窥屏看到 |
 | `vwhisper.toggle.bypass` | 能发给关了私聊的人 |
 | `vwhisper.ignore.bypass` | 能发给把自己屏蔽了的人 |

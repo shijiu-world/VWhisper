@@ -135,8 +135,6 @@ public final class VWhisper {
         final Configuration.ServerFilter filter = config.filter();
         logger.info("[vwhisper] 私聊内容颜色：" + config.colorMode()
                 + "（strip=剥 / parse=解析 / keep=原样；有 vwhisper.msg.color 权限的一律解析）");
-        logger.info("[vwhisper] 渐变：" + (config.gradientPermission().isEmpty()
-                ? "所有人可用" : "需要权限 " + config.gradientPermission()));
         logger.info("[vwhisper] 子服名单：" + (filter.isWhitelist() ? "白名单" : "黑名单")
                 + (filter.servers().isEmpty() ? "（空 = 全都参与）" : " " + String.join(", ", filter.servers())));
         logger.info("[vwhisper] 提示音：" + (config.soundEnabled() ? config.soundName() : "关"));

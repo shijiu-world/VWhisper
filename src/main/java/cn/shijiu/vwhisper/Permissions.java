@@ -16,7 +16,7 @@ import com.velocitypowered.api.permission.Tristate;
  *       allow-by-default 对它们无效。默认只有控制台和 OP 能用。</li>
  * </ul>
  *
- * <p>LuckPerms 里一般这么给：
+ * <p>注：渐变没有单独节点 —— 能用颜色就能用渐变，省得再配一遍。
  * <pre>
  *   /lp group default permission set vwhisper.msg true
  *   /lp group admin permission set vwhisper.* true      # 通配符，全部放通
@@ -26,10 +26,8 @@ public final class Permissions {
 
     /** 发私聊 /msg。 */
     public static final String MSG = "vwhisper.msg";
-    /** 消息内容里可以用颜色码（&c、&#FF0000）。 */
+    /** 消息内容里可以用颜色码（&c、&#FF0000、渐变）—— 渐变不单独设权限，跟着这一个走。 */
     public static final String MSG_COLOR = "vwhisper.msg.color";
-    /** 渐变 {#FF0000>}文字{#FF0000<} 的默认权限节点（可以在 colors.gradient-permission 里改）。 */
-    public static final String MSG_GRADIENT = "vwhisper.msg.gradient";
     /** /reply 快速回复。 */
     public static final String REPLY = "vwhisper.reply";
     /** /spy 窥屏。 */

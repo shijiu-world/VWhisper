@@ -47,8 +47,6 @@ public final class ChatColors {
             Pattern.compile("\\{#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})>\\}|\\{#[^\\{\\}<>]*>\\}");
     /** 落单的渐变结束标记 */
     private static final Pattern GRADIENT_END = Pattern.compile("\\{#[^\\{\\}]*?<(>?)\\}");
-    /** 没有渐变权限时，只摘这两个标记，文字留下 */
-    private static final Pattern GRADIENT_MARKER = Pattern.compile("\\{#[^\\{\\}]*?[<>][>]?\\}");
     private static final Pattern FONT = Pattern.compile("\\{@[^\\{\\}]*\\}");
     private static final Pattern HEX_BRACE_6 = Pattern.compile("\\{#([0-9a-fA-F]{6})\\}");
     private static final Pattern HEX_BRACE_3 = Pattern.compile("\\{#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])\\}");
@@ -75,20 +73,16 @@ public final class ChatColors {
     }
 
     /**
-     * 按模式把私聊内容变成组件。
+     * 按模式把私聊内容变成组件。渐变不单独 gate —— 跟着 mode 走，跟别的颜色码一个待遇。
      *
-     * @param mode            strip / parse / keep
-     * @param raw            玩家打的原话
-     * @param gradientAllowed 渐变权限；false 时只摘掉渐变标记，其余颜色照常解析
+     * @param mode strip / parse / keep
+     * @param raw  玩家打的原话
      */
-    public static Component component(final String mode, final String raw, final boolean gradientAllowed) {
+    public static Component component(final String mode, final String raw) {
         final String text = raw == null ? "" : raw;
         if (!"parse".equals(mode)) {
             // keep：把 &c 原样显示出来；strip：把标记删掉
             return Component.text("strip".equals(mode) ? strip(text) : text);
-        }
-        if (!gradientAllowed) {
-            return SERIALIZER.deserialize(normalize(GRADIENT_MARKER.matcher(text).replaceAll("")));
         }
         // 渐变没法用一串 & 码表达：先抠出来留个哨兵，其余走 legacy，解析完再把哨兵换成逐字染好色的组件
         final List<Gradient> gradients = new ArrayList<>();

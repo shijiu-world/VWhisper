@@ -31,7 +31,7 @@ public class SmokeTest {
         check("带引号的中文提示语", ((String) map.get("messages.prefix")).contains("私聊"));
         check("行尾注释不会串进值里", ((String) map.get("messages.no-permission")).endsWith("#permission#）。"));
         check("空数组", ((List<?>) map.get("servers.list")).isEmpty());
-        check("渐变权限节点", "vwhisper.msg.gradient".equals(map.get("colors.gradient-permission")));
+        check("渐变不再需要单独权限（配置项已删）", !map.containsKey("colors.gradient-permission"));
 
         // ---- 服务器名单 ----
         final Configuration cfg = new ConfigurationProbe(map).unwrap();
@@ -53,19 +53,20 @@ public class SmokeTest {
         check("字体标记摘掉", ChatColors.normalize("{@uniform}字").equals("字"));
         check("孤立渐变尾巴摘掉", ChatColors.normalize("哈{#FF0000<}").equals("哈"));
         check("孤立渐变起始退化成单色", ChatColors.normalize("{#FF0000>}红字").equals("&#ff0000红字"));
-        check("strip 模式删干净", letPlain(ChatColors.component("strip", "&c红&#FF0000色", true)).equals("红色"));
-        check("keep 模式原样显示", letPlain(ChatColors.component("keep", "&c红", true)).equals("&c红"));
-        final Component parsed = ChatColors.component("parse", "&c红", true);
+        check("strip 模式删干净", letPlain(ChatColors.component("strip", "&c红&#FF0000色")).equals("红色"));
+        check("keep 模式原样显示", letPlain(ChatColors.component("keep", "&c红")).equals("&c红"));
+        final Component parsed = ChatColors.component("parse", "&c红");
         check("parse 模式真的上色了", parsed.color() != null && parsed.color().value() == 0xFF5555);
 
         // ---- 渐变 ----
-        final Component gradient = ChatColors.component("parse", "{#FF0000>}嘿{#0000FF<}", true);
+        final Component gradient = ChatColors.component("parse", "{#FF0000>}嘿{#0000FF<}");
         final String plain = letPlain(gradient);
         check("渐变文字不丢也不留标记", plain.equals("嘿"));
         check("渐变渲染成了多个染色段", countColored(gradient) == 1);
-        final Component noPermission = ChatColors.component("parse", "{#FF0000>}嘿{#0000FF<}", false);
-        check("没渐变权限时只摘标记，文字留下", letPlain(noPermission).equals("嘿"));
-        final Component multi = ChatColors.component("parse", "前{#FF0000>}一二三{#0000FF<}后", true);
+        // 渐变不再单独要权限，但 strip 模式下标记绝不能漏给玩家去看
+        final Component stripped = ChatColors.component("strip", "{#FF0000>}嘿{#0000FF<}");
+        check("strip 模式下渐变标记也剥掉，文字留下", letPlain(stripped).equals("嘿"));
+        final Component multi = ChatColors.component("parse", "前{#FF0000>}一二三{#0000FF<}后");
         check("渐变混着普通文字：顺序对", letPlain(multi).equals("前一二三后"));
 
         // ---- 默认配置兜底 ----
