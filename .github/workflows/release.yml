@@ -18,11 +18,11 @@ jobs:
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # pom 里是 --release 17（class 61，Velocity 3.4+ / 4.x 都要这个）
       - name: 准备 JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -38,7 +38,7 @@ jobs:
           ls -l dist
 
       - name: 上传构建产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: VWhisper
           path: dist/*.jar
