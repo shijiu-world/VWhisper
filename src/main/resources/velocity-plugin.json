@@ -1,0 +1,16 @@
+{
+  "id": "vwhisper",
+  "name": "VWhisper",
+  "version": "${project.version}",
+  "description": "跨服私聊：/msg /reply /spy /msgtoggle /ignore。纯代理端，子服不用装任何东西。",
+  "authors": [
+    "拾玖世界"
+  ],
+  "dependencies": [
+    {
+      "id": "luckperms",
+      "optional": true
+    }
+  ],
+  "main": "cn.shijiu.vwhisper.VWhisper"
+}

@@ -1,0 +1,139 @@
+# ============================================================
+#  VWhisper —— 跨服私聊配置
+#  改完之后：游戏内敲 /vwhisper reload（需要 vwhisper.reload 权限），
+#            或者在控制台直接敲 /vwhisper reload
+#  ⚠️ 写在 # 后面的是注释。注意：没加引号的值不要在同一行再写 # 注释。
+# ============================================================
+
+# ------------------------------------------------------------
+# 服务器名单：哪些子服参与私聊
+#   blacklist = 名单里的服不能发也不能收（默认，空名单 = 全都行）
+#   whitelist = 只有名单里的服能用（空名单 = 全服都发不出去，慎用）
+# 服名写 velocity.toml 的 [servers] 里的名字，大小写不敏感
+# 例：想让起床服不影响别人也不被人打扰 → mode = "blacklist"、list = ["bedwars"]
+# ------------------------------------------------------------
+[servers]
+mode = "blacklist"
+list = []
+
+# ------------------------------------------------------------
+# 权限：没在 LuckPerms 里配过的权限节点算不算有？
+#   true  = 普通节点（vwhisper.msg / reply / toggle / ignore）默认人人可用
+#   false = 必须去 LuckPerms 显式给，不给就发不出私聊
+# ⚠️ 特权节点不受这一项影响，一律要显式给：
+#   vwhisper.spy、vwhisper.reload、各种 bypass、vwhisper.msg.color
+# ------------------------------------------------------------
+[permissions]
+allow-by-default = true
+
+# ------------------------------------------------------------
+# 玩家在私聊内容里写的颜色码怎么处理
+#   strip = 一律剥掉（&c 会被删掉，看不见）
+#   parse = 一律解析（所有人都能用 &c、&#FF0000、渐变）
+#   keep  = 原样保留（会把 &c 原样显示出来）
+# ⚠️ 有 vwhisper.msg.color 权限的玩家，不管这里配什么都按 parse 处理。
+# ------------------------------------------------------------
+[colors]
+mode = "keep"
+# 渐变 {#FF0000>}这段文字是渐变的{#0000FF<} 需要的权限，留空 = 所有人可用
+gradient-permission = "vwhisper.msg.gradient"
+
+# ------------------------------------------------------------
+# 消息格式
+#   minimessage = false 时下面这些串用 & 颜色码写（&#RRGGBB 这种十六进制也认）；
+#                 true  时改用 MiniMessage 语法（<red>、<#FF0000>、<gradient:#FFF:#000>…</gradient>）
+# 可用占位符：
+#   #sender#          发送者名字      #target#          接收者名字
+#   #sender-server#   发送者所在服    #target-server#   接收者所在服
+#   #message#         消息内容（永远放在最后）
+# 控制台群发 /msg 时，#sender# = 控制台、#sender-server# = console
+# ------------------------------------------------------------
+[format]
+minimessage = false
+sender = "&8[&7我 &8→ &7#target#&8]&r #message#"
+receiver = "&8[&7#sender# &8→ &7我&8]&r #message#"
+spy = "&8[&cSpy&8] &7#sender# &8→ &7#target#&8:&r #message#"
+# 从控制台发出的那一份（发给玩家看的）
+console = "&8[&c控制台 &8→ &7我&8]&r #message#"
+
+# ------------------------------------------------------------
+# 各种提示语。#target# / #seconds# / #amount# 会被自动替换，
+# 每条前面会自动拼上下面的 prefix
+# ------------------------------------------------------------
+[messages]
+prefix = "&8[&b私聊&8]&r"
+no-permission = "&c你没有权限这么做（缺 #permission#）。"
+players-only = "&c这条命令只有玩家能用。"
+usage-msg = "&7用法：&f/msg <玩家> <消息>"
+usage-reply = "&7用法：&f/reply <消息>"
+usage-ignore = "&7用法：&f/ignore <玩家>"
+player-not-found = "&c找不到在线玩家 &7#target#&c。"
+ambiguous-target = "&7#target# &c有多个人名匹配，多打几个字。"
+self-message = "&c不能给自己发私聊。"
+target-off = "&7#target# &c关了私聊，消息没有发出去。"
+target-ignored = "&7#target# &c屏蔽了你，消息没有发出去。"
+server-denied = "&c这个服务器不能使用私聊。"
+cooldown = "&c慢一点，还要 &7#seconds# &c秒。"
+no-reply-target = "&c还没有可以回复的人。"
+reply-target-offline = "&c你要回复的人已经下线了。"
+spy-on = "&a已开启私聊窥屏（管理视角）。"
+spy-off = "&a已关闭私聊窥屏。"
+toggle-off = "&a已关闭接收私聊。"
+toggle-on = "&a已恢复接收私聊。"
+ignore-added = "&a已屏蔽 &7#target#&a。"
+ignore-removed = "&a已取消屏蔽 &7#target#&a。"
+ignore-self = "&c不能屏蔽自己。"
+reloaded = "&a配置已重新加载。"
+reload-failed = "&c配置加载失败，用的还是旧配置。原因：#reason#"
+unknown-target-in-past = "&c对方已经不在了。"
+
+# ------------------------------------------------------------
+# 冷却：同一个玩家多久只能发一条（秒）。0 = 不限。
+# 有 vwhisper.cooldown.bypass 权限的人不受限制。
+# ------------------------------------------------------------
+[cooldown]
+seconds = 0
+
+# ------------------------------------------------------------
+# 收到私聊时给对方放个提示音。enabled = false 关掉。
+# 音效名是原版 id，留空也可以。
+# ------------------------------------------------------------
+[sound]
+enabled = true
+name = "minecraft:entity.experience_orb.pickup"
+volume = 1.0
+pitch = 1.0
+
+# ------------------------------------------------------------
+# 屏蔽名单（/ignore）和「关掉私聊」（/msgtoggle）要不要存下来：
+# 存了的话代理重启后玩家的设置在。存在 plugins/vwhisper/ 下面。
+# spy 状态一律不存 —— 重启自动关，免得忘记关掉。
+# ------------------------------------------------------------
+[storage]
+save-ignores = true
+save-toggles = true
+
+# ------------------------------------------------------------
+# 命令别名
+#   这里写的是别名，主命令名固定（/msg /reply /msgtoggle /ignore /spy /vwhisper）。
+#   ⚠️ Velocity 上同一个名字只能注册一次 —— 如果别的插件也抢了 /w、/m 这种短命令，
+#      起服时会看到冲突提示，把那个别名从这里删掉即可。
+#   写空 list = [] 就是不给别名（主命令还在）。
+# ------------------------------------------------------------
+[commands]
+msg = ["tell", "w", "m", "pm", "whisper"]
+reply = ["r"]
+msgtoggle = ["togglemsg", "tmsg"]
+ignore = []
+spy = ["socialspy", "msgspy"]
+vwhisper = ["VWhisper", "vws"]
+
+# ------------------------------------------------------------
+# 杂项
+#   auto-reload = 改了本文件不用敲命令，自己会在几秒内热重载（按修改时间判断）
+#   log-to-console = 每条私聊往控制台打一行（查纠纷用）
+# ------------------------------------------------------------
+[advanced]
+auto-reload = false
+auto-reload-interval-seconds = 3
+log-to-console = true
