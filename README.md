@@ -136,8 +136,9 @@ LuckPerms 里通常这么给：
 - **不依赖 PAPIProxyBridge**、也不需要在子服装任何东西：称号前缀这类变量走不了代理这条路，索性不做。
 - **LuckPerms**：不是硬依赖，权限判定走 Velocity 原生的 `CommandSource#getPermissionValue`，
   谁提供权限都不影响（通常就是 LuckPerms）。
-- **整套零第三方依赖**：jar 里除 Velocity 之外不引用任何库，所以不会出现 `NoClassDefFoundError`。
+- **整套零第三方依赖**：jar 里不放任何库（本机 Maven 离线，也 shade 不进去），
   颜色（`&c` / `&#RRGGBB` / CMI 的花括号写法 / 渐变）是自己写的解析器，不引 PAPI、不引 mini。
+  ⚠️ 但「零依赖」不等于不会 `NoClassDefFoundError` —— 见下面的血泪教训。
 
 ## 已知边界
 
@@ -146,6 +147,10 @@ LuckPerms 里通常这么给：
 - 屏蔽名单和接收开关存在 `plugins/vwhisper/` 下的两个纯文本文件里（一行一条 UUID，肉眼可读）；
   **窥屏状态故意不落盘** —— 重启自动关，免得忘了关还在看别人的私聊。
 - 冷却也是内存态，重启清零。
+- **组件转纯文本（控制台日志）没用 `PlainComponentSerializer`** —— 那个类在 Velocity
+  发布 jar 里不存在，用了就是 `NoClassDefFoundError`（详见 `tests/ClasspathTest.java`）。
+  自己的 `PlainText.of()` 只用 `Component.children()` + `TextComponent.content()` 递归，
+  都在 `adventure-api` 里、Velocity 一定有。
 
 ## 从源码构建
 
@@ -161,7 +166,46 @@ JAVA_HOME=D:/Code/Java/zulu25.34.17-ca-jdk25.0.3-win_x64 mvn -B -o clean package
 
 ## 测试
 
-两个测试都在仓库的 `tests/` 下，手动跑（没有接 JUnit，本机 Maven 是离线环境）：
-- `ServiceTest`：用动态代理把 Velocity API 桩掉，跑真实的 `WhisperService` / `MsgCommand`，
-  覆盖权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全 —— 28 条断言
-- 实机：本地 `D:\game\test_velocity`（Velocity 4.1.0-SNAPSHOT + LuckPerms + PAPIProxyBridge）起服通过，零异常
+三个测试都在仓库的 `tests/` 下，手动跑（没接 JUnit）。**建议用 PowerShell 跑** ——
+Git Bash 会对 `-cp` 里的 `D:/...` 做路径转换，JVM 会莫名其妙找不到主类。
+
+```powershell
+cd D:\Code\mc\plugins\VWhisper
+mvn -B -o -q package
+$jdk = "D:\Code\Java\zulu25.34.17-ca-jdk25.0.3-win_x64\bin"
+$cp  = "target\classes;D:\game\test_velocity\velocity\velocity-4.1.0-SNAPSHOT-16.jar"
+$out = "D:\tmp\vwtest"
+& "$jdk\javac.exe" -encoding UTF-8 -cp $cp -d $out tests\*.java
+
+& "$jdk\java.exe" -cp "$cp;$out" SmokeTest   target\classes\config.toml
+& "$jdk\java.exe" -cp "$cp;$out" ServiceTest
+& "$jdk\java.exe" -cp "$cp;$out" ClasspathTest D:\game\test_velocity\velocity\velocity-4.1.0-SNAPSHOT-16.jar
+```
+
+| 测试 | 断言 | 覆盖 |
+|---|---|---|
+| `SmokeTest` | 48 | TOML 解析、颜色/渐变渲染（**要传 `target/classes/config.toml` 作 `args[0]`**） |
+| `ServiceTest` | 49 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全 |
+| `ClasspathTest` | 3 | 运行环境校验，见下 |
+
+> `ClasspathTest` 是 `/msg` 一次实机崩溃之后补的。它用一个**只看得见 velocity jar + 本项目 classes**
+> 的隔离 ClassLoader 加载并调用工具类，同时反向验证旧的写法在同一环境里确实挂 ——
+> 否则这测试就是在自欺欺人（跑得再绿也说明不了问题）。
+
+## 血泪教训：编译能过 ≠ 运行就有
+
+曾经在一次实机里，`/msg` 一执行就炸：
+
+```
+NoClassDefFoundError: net/kyori/adventure/text/serializer/plain/PlainComponentSerializer
+  at cn.shijiu.vwhisper.WhisperService.deliver(WhisperService.java:211)
+```
+
+编译期毫无征兆：maven 的 `velocity-api`（provided）把这个类带了进来，IDE 能补全、javac 能过；
+但 **Velocity 4.x 的发布 jar 里根本没有它** —— `adventure-text-serializer-plain`
+这个 artifact 没被打进 proxy，插件的 classloader 自然找不到。
+
+> 📌 **给 Velocity 写插件时**：凡是边界上的类（各种 serializer、非常规 artifact），
+> 先去 `velocity-*.jar` 里确认它在不在，别信 IDE 的自动补全。
+> 排查办法：把源码里所有 `import` 拎出来，逐个对照 jar 里的 `.class` 路径查一遍 ——
+> 本项目就只有这一处中招（其余 22 个外部类都在）。

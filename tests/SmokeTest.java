@@ -1,5 +1,6 @@
 import cn.shijiu.vwhisper.ChatColors;
 import cn.shijiu.vwhisper.Configuration;
+import cn.shijiu.vwhisper.PlainText;
 import cn.shijiu.vwhisper.TomlLite;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -115,7 +116,7 @@ public class SmokeTest {
     }
 
     private static String letPlain(final Component c) {
-        return net.kyori.adventure.text.serializer.plain.PlainComponentSerializer.plain().serialize(c);
+        return PlainText.of(c);
     }
 
     private static int countColored(final Component c) {

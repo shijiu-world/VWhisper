@@ -1,4 +1,5 @@
 import cn.shijiu.vwhisper.Configuration;
+import cn.shijiu.vwhisper.PlainText;
 import cn.shijiu.vwhisper.Store;
 import cn.shijiu.vwhisper.TomlLite;
 import cn.shijiu.vwhisper.VWhisper;
@@ -13,7 +14,6 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.server.ServerInfo;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainComponentSerializer;
 import org.slf4j.Logger;
 
 import java.io.InputStream;
@@ -98,7 +98,7 @@ public class ServiceTest {
         String allText() {
             final StringBuilder builder = new StringBuilder();
             for (final Component c : inbox) {
-                builder.append(PlainComponentSerializer.plain().serialize(c)).append('\n');
+                builder.append(PlainText.of(c)).append('\n');
             }
             return builder.toString();
         }

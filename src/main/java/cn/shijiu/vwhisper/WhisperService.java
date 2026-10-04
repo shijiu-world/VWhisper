@@ -7,7 +7,6 @@ import net.kyori.adventure.key.Key;
 import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.serializer.plain.PlainComponentSerializer;
 import org.slf4j.Logger;
 
 import java.util.LinkedHashMap;
@@ -208,7 +207,7 @@ public final class WhisperService {
 
         if (config.logToConsole()) {
             logger.info("[vwhisper] " + senderName + " -> " + target.getUsername() + ": "
-                    + PlainComponentSerializer.plain().serialize(message));
+                    + PlainText.of(message));
         }
     }
 
