@@ -77,6 +77,17 @@ public class SmokeTest {
         check("默认允许所有人发私聊", defaults.allowByDefault());
         check("默认主命令别名是 vw", defaults.rootAliases().contains("vw"));
         check("提示语里的 #label# 换成实际命令名", defaults.label().equals("/vw"));
+
+        // ---- 顶层快捷命令 [shortcuts] ----
+        check("shortcuts 解析成 命令名->子命令", "msg".equals(map.get("shortcuts.msg")));
+        check("默认接管 /msg", defaults.shortcuts().containsKey("msg"));
+        check("默认接管 /w", defaults.shortcuts().containsKey("w"));
+        check("默认接管 /r（指向 reply）", "reply".equals(defaults.shortcuts().get("r")));
+        check("快捷命令不和主命令别名撞名", !defaults.shortcuts().containsKey("vw"));
+        check("走 /msg 进来时提示语显示 /msg", defaults.label("msg", "msg").equals("/msg"));
+        check("走 /vw msg 进来时提示语显示 /vw msg", defaults.label("vw", "msg").equals("/vw msg"));
+        check("拿不到 alias 时退回 /vw msg", defaults.label(null, "msg").equals("/vw msg"));
+        check("用法提示里不再写死子命令名", defaults.rawMessage("usage-msg").equals("&7用法：&f#label# <玩家> <消息>"));
         check("子命令别名表里没有 root", !defaults.subAliases().containsKey("root"));
         check("提示语自动拼 prefix", defaults.message("self-message").startsWith("&8[&b私聊&8]&r"));
         check("提示语缺配置时有兜底", defaults.message("根本没这个键").contains("messages.根本没这个键"));

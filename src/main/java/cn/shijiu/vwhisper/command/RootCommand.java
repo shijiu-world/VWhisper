@@ -154,6 +154,17 @@ public final class RootCommand implements SimpleCommand {
         plugin.send(source, "&7" + config.label() + " help &8- &f看这个列表");
     }
 
+    /**
+     * 按名字（或别名）找子命令的执行器；找不到返回 null。
+     *
+     * <p>{@code [shortcuts]} 里配的顶层快捷命令靠这个拿到要注册的那个子命令实例 ——
+     * 子命令本身就是 {@link SimpleCommand}，可以直接交给 Velocity 注册。
+     */
+    public SimpleCommand lookup(final String nameOrAlias) {
+        final Entry entry = resolve(nameOrAlias == null ? "" : nameOrAlias.toLowerCase(Locale.ROOT));
+        return entry == null ? null : entry.command;
+    }
+
     /** 按名字（或别名）找子命令；找不到返回 null。 */
     private Entry resolve(final String name) {
         final Entry direct = entries.get(name);

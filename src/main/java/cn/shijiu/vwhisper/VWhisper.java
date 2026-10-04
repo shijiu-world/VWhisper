@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -33,7 +34,7 @@ import java.util.concurrent.TimeUnit;
         id = "vwhisper",
         name = "VWhisper",
         version = "1.0.0",
-        description = "跨服私聊：/msg /reply /spy /msgtoggle /ignore",
+        description = "跨服私聊：/vw msg /vw reply /vw spy /vw toggle /vw ignore",
         authors = {"拾玖世界"}
 )
 public final class VWhisper {
@@ -83,12 +84,56 @@ public final class VWhisper {
     // ------------------------------------------------------------------
 
     /**
-     * 只注册一个命令：{@code /vwhisper}，别名（默认 {@code /vw}）来自 config.toml 的
-     * {@code [commands] root}。私聊、屏蔽、窥屏、重载全是它的子命令 —— 这样代理上只占一个
-     * 命令名，不会跟别的插件抢 /msg、/w 之类，也不会误伤后端子服自己的命令。
+     * 注册一个命令：{@code /vwhisper}，别名（默认 {@code /vw}）来自 config.toml 的
+     * {@code [commands] root}。私聊、屏蔽、窥屏、重载全是它的子命令。
      */
     private void registerCommands() {
-        register("vwhisper", new RootCommand(this), config.rootAliases());
+        final RootCommand root = new RootCommand(this);
+        register("vwhisper", root, config.rootAliases());
+        registerShortcuts(root);
+    }
+
+    /**
+     * {@code [shortcuts]}：把子命令直接注册成顶层命令（默认接管 {@code /msg /w /m /tell /whisper}
+     * 和 {@code /reply /r}）。
+     *
+     * <p>为什么要这个：Velocity 上谁注册了命令谁说了算 —— 代理端有同名命令时，
+     * 玩家敲 {@code /msg} 根本不会往后端转发，后端子服自己那个（CMI 的 {@code /msg}）
+     * 就彻底收不到了。想让全服私聊统一走 VWhisper（顺带跨服），就靠这一层。
+     * 子服里 {@code /cmi msg} 这种带前缀的写法不受影响，只是短命令被接管。
+     *
+     * <p>⚠️ 命令名是在起服时注册的，改这里要重启代理（配置本身仍可 {@code /vw reload}）。
+     */
+    private void registerShortcuts(final RootCommand root) {
+        final List<String> taken = new ArrayList<>();
+        taken.add("vwhisper");
+        for (final String alias : config.rootAliases()) {
+            taken.add(alias.toLowerCase(Locale.ROOT));
+        }
+        final List<String> ok = new ArrayList<>();
+        for (final Map.Entry<String, String> e : config.shortcuts().entrySet()) {
+            final String name = e.getKey();
+            if (taken.contains(name)) {
+                logger.warn("[vwhisper] 快捷命令 /" + name + " 跟主命令重名，跳过。");
+                continue;
+            }
+            final SimpleCommand command = root.lookup(e.getValue());
+            if (command == null) {
+                logger.warn("[vwhisper] 快捷命令 /" + name + " 指向了不存在的子命令「" + e.getValue() + "」，跳过。");
+                continue;
+            }
+            try {
+                register(name, command, List.of());
+                ok.add("/" + name);
+            } catch (final Exception ex) {
+                // 别的插件先占了这个名字 —— 只丢这一条，不影响其它命令
+                logger.warn("[vwhisper] 快捷命令 /" + name + " 没注册上（可能别的插件已经占用）：" + ex);
+            }
+        }
+        if (!ok.isEmpty()) {
+            logger.info("[vwhisper] 已接管顶层命令：" + String.join(" ", ok)
+                    + "（代理优先处理，后端子服同名的命令不会再收到）");
+        }
     }
 
     private void register(final String name, final SimpleCommand command, final List<String> aliases) {

@@ -71,6 +71,8 @@ public final class Configuration {
     private final List<String> rootAliases;
     /** 子命令别名：子命令主名 -> 别名列表（在 /vw 后面敲的那个词）。 */
     private final Map<String, List<String>> subAliases;
+    /** 顶层快捷命令：命令名 -> 子命令主名（注册到 Velocity 顶层，会盖掉子服同名的命令）。 */
+    private final Map<String, String> shortcuts;
 
     private Configuration(final Map<String, Object> m) {
         this.filter = new ServerFilter(
@@ -126,6 +128,19 @@ public final class Configuration {
         final List<String> root = commands.remove("root");
         this.rootAliases = root == null ? Collections.singletonList("vw") : root;
         this.subAliases = Collections.unmodifiableMap(commands);
+
+        // [shortcuts] 段：把某个子命令直接注册成顶层命令（"命令名" = "子命令主名"）
+        // 值统一小写，注册时拿它去 RootCommand 里找执行器
+        final Map<String, String> sc = new LinkedHashMap<>();
+        for (final Map.Entry<String, Object> e : m.entrySet()) {
+            if (e.getKey().startsWith("shortcuts.") && e.getValue() instanceof String) {
+                final String target = ((String) e.getValue()).trim().toLowerCase(Locale.ROOT);
+                if (!target.isEmpty()) {
+                    sc.put(e.getKey().substring("shortcuts.".length()).toLowerCase(Locale.ROOT), target);
+                }
+            }
+        }
+        this.shortcuts = Collections.unmodifiableMap(sc);
     }
 
     // ------------------------------------------------------------------
@@ -215,12 +230,14 @@ public final class Configuration {
         if (text == null) {
             text = "&c(缺少配置项 messages." + key + ")";
         }
-        // #label# 自动填成实际命令名（/vw 之类）—— 改了别名提示语也跟着变，不用逐个改
-        if (text.contains("#label#")) {
-            text = text.replace("#label#", label());
-        }
+        // 先替换调用方传进来的 —— 允许用 ("label", "/msg") 覆盖掉默认的 #label#，
+        // 这样从顶层快捷命令进来时，用法提示显示的就是玩家真正敲的那个命令
         for (int i = 0; i + 1 < args.length; i += 2) {
             text = text.replace("#" + args[i] + "#", String.valueOf(args[i + 1]));
+        }
+        // #label# 最后兜底填成实际命令名（/vw 之类）—— 改了别名提示语也跟着变，不用逐个改
+        if (text.contains("#label#")) {
+            text = text.replace("#label#", label());
         }
         return prefix + text;
     }
@@ -229,6 +246,23 @@ public final class Configuration {
     public String label() {
         final String first = rootAliases.isEmpty() ? null : rootAliases.get(0);
         return "/" + (first == null || first.isEmpty() ? "vwhisper" : first);
+    }
+
+    /**
+     * 提示语里显示成什么命令名 —— 按玩家实际敲的那个命令来。
+     *
+     * @param alias 玩家敲的命令名（Velocity 的 {@code Invocation#alias()}，不含斜杠）
+     * @param sub   子命令主名
+     * @return 走顶层快捷命令时是 {@code /msg} 这种，走主命令时是 {@code /vw msg} 这种
+     */
+    public String label(final String alias, final String sub) {
+        if (alias == null || alias.isEmpty()) {
+            return label() + " " + sub;
+        }
+        if (shortcuts.containsKey(alias.toLowerCase(Locale.ROOT))) {
+            return "/" + alias;
+        }
+        return "/" + alias + " " + sub;
     }
 
     /** 不带 prefix 的原始提示语 —— 少数场景（比如要拼换行）用。 */
@@ -285,6 +319,10 @@ public final class Configuration {
     /** 子命令别名表：键是子命令主名（msg / reply / …），值是在 /vw 后面能用的别名。 */
     public Map<String, List<String>> subAliases() {
         return subAliases;
+    }
+
+    public Map<String, String> shortcuts() {
+        return shortcuts;
     }
 
     // ------------------------------------------------------------------

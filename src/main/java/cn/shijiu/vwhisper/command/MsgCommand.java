@@ -36,7 +36,9 @@ public final class MsgCommand implements SimpleCommand {
             return;
         }
         if (args.length < 2) {
-            plugin.send(source, config.message("usage-msg"));
+            // 走顶层快捷命令（/msg）时提示 /msg <玩家> <消息>，走 /vw msg 时提示 /vw msg …
+            plugin.send(source, config.message("usage-msg",
+                    "label", config.label(invocation.alias(), "msg")));
             return;
         }
         final String message = String.join(" ", Arrays.copyOfRange(args, 1, args.length));

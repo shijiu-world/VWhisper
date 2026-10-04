@@ -63,9 +63,10 @@ console = "&8[&c控制台 &8→ &7我&8]&r #message#"
 prefix = "&8[&b私聊&8]&r"
 no-permission = "&c你没有权限这么做（缺 #permission#）。"
 players-only = "&c这条命令只有玩家能用。"
-usage-msg = "&7用法：&f#label# msg <玩家> <消息>"
-usage-reply = "&7用法：&f#label# reply <消息>"
-usage-ignore = "&7用法：&f#label# ignore <玩家>"
+# ⚠️ #label# 会自动换成玩家真正敲的那个命令（走 /msg 就是 /msg，走 /vw msg 就是 /vw msg）
+usage-msg = "&7用法：&f#label# <玩家> <消息>"
+usage-reply = "&7用法：&f#label# <消息>"
+usage-ignore = "&7用法：&f#label# <玩家>"
 unknown-subcommand = "&c没有 &7#sub# &c这个子命令，敲 &f#label# help &c看列表。"
 player-not-found = "&c找不到在线玩家 &7#target#&c。"
 ambiguous-target = "&7#target# &c有多个人名匹配，多打几个字。"
@@ -133,6 +134,28 @@ spy = ["socialspy", "msgspy"]
 reload = ["rl"]
 version = ["info", "ver"]
 help = ["?"]
+
+# ------------------------------------------------------------
+# 顶层快捷命令：把子命令直接注册成 /msg、/w 这种短命令，不用敲 /vw 前缀
+#   格式：命令名 = "子命令主名"（左边是要注册的命令名，右边是它干的事）
+#
+# ⚠️ 重点：代理上谁注册了命令谁说了算。这里注册了 /msg，玩家敲 /msg 就由代理处理，
+#   根本不会转发到后端子服 —— 也就是说后端自己的 /msg（CMI 的那个）会被彻底盖掉。
+#   这是故意的：全服私聊统一走 VWhisper，顺带就跨服了。
+#   子服里带前缀的写法（/cmi msg）不受影响，被接管的只是短命令。
+#
+# ⚠️ 命令名在起服时注册 —— 改这里要重启代理（config 的其它部分仍可 /vw reload 热更新）。
+# ⚠️ 名字被别的插件先占了会注册失败，起服日志里会有 WARN，插件其它功能不受影响。
+# 不想接管哪个就把那一行删掉（或注释掉）。
+# ------------------------------------------------------------
+[shortcuts]
+msg = "msg"
+w = "msg"
+m = "msg"
+tell = "msg"
+whisper = "msg"
+reply = "reply"
+r = "reply"
 
 # ------------------------------------------------------------
 # 杂项

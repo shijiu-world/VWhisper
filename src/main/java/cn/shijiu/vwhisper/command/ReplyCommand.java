@@ -36,11 +36,13 @@ public final class ReplyCommand implements SimpleCommand {
             return;
         }
         if (!(source instanceof Player)) {
-            plugin.send(source, config.message("usage-reply"));
+            plugin.send(source, config.message("usage-reply",
+                    "label", config.label(invocation.alias(), "reply")));
             return;
         }
         if (args.length < 1) {
-            plugin.send(source, config.message("usage-reply"));
+            plugin.send(source, config.message("usage-reply",
+                    "label", config.label(invocation.alias(), "reply")));
             return;
         }
         final Player me = (Player) source;

@@ -35,11 +35,13 @@ public final class IgnoreCommand implements SimpleCommand {
             return;
         }
         if (!(source instanceof Player)) {
-            plugin.send(source, config.message("usage-ignore"));
+            plugin.send(source, config.message("usage-ignore",
+                    "label", config.label(invocation.alias(), "ignore")));
             return;
         }
         if (args.length < 1) {
-            plugin.send(source, config.message("usage-ignore"));
+            plugin.send(source, config.message("usage-ignore",
+                    "label", config.label(invocation.alias(), "ignore")));
             return;
         }
         final Player me = (Player) source;

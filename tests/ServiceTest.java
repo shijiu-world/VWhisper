@@ -289,13 +289,19 @@ public class ServiceTest {
     private static final Set<String> BASIC = perms(
             "vwhisper.msg", "vwhisper.reply", "vwhisper.toggle", "vwhisper.ignore");
 
+    /** 默认当玩家敲的是主命令（/vw）—— 想模拟顶层快捷命令就用 invocationAs("msg", …)。 */
     private static Invocation invocation(final CommandSource source, final String... arguments) {
+        return invocationAs("vw", source, arguments);
+    }
+
+    private static Invocation invocationAs(final String alias, final CommandSource source,
+                                           final String... arguments) {
         return (Invocation) Proxy.newProxyInstance(loader(), new Class<?>[]{Invocation.class},
                 (proxy, method, args) -> {
                     switch (method.getName()) {
                         case "source": return source;
                         case "arguments": return arguments;
-                        case "alias": return "msg";
+                        case "alias": return alias;
                         default: return Defaults.forType(method.getReturnType());
                     }
                 });
@@ -467,6 +473,28 @@ public class ServiceTest {
 
         final List<String> delegated = root.suggest(invocation(alice.source, "msg", "b"));
         check("子命令名之后交给子命令补全", delegated.contains("Bob"));
+
+        // ---- 12. 顶层快捷命令（[shortcuts]：/msg、/w 那些）----
+        check("root 能按主名找到子命令", root.lookup("msg") != null);
+        check("root 能按别名找到子命令", root.lookup("w") != null);
+        check("找不到的子命令返回 null", root.lookup("nonsense") == null);
+        check("配置里默认接管 /msg", "msg".equals(plugin.configuration().shortcuts().get("msg")));
+        check("配置里默认接管 /r → reply", "reply".equals(plugin.configuration().shortcuts().get("r")));
+
+        // 顶层命令注册的就是子命令本身，直接跑一遍等于玩家敲 /msg
+        alice.clear();
+        bob.clear();
+        new MsgCommand(plugin).execute(invocationAs("msg", alice.source, "Bob", "从 /msg 进来"));
+        check("/msg 直接发得出去", bob.saw("Alice→我: 从 /msg 进来"));
+
+        alice.clear();
+        new MsgCommand(plugin).execute(invocationAs("msg", alice.source, "Bob"));
+        check("从 /msg 进来时用法提示写的是 /msg", alice.saw("/msg <玩家> <消息>"));
+        check("  并且不会串成 /vw msg", !alice.saw("/vw msg"));
+
+        alice.clear();
+        root.execute(invocation(alice.source, "msg", "Bob"));
+        check("从 /vw msg 进来时用法提示写的是 /vw msg", alice.saw("/vw msg <玩家> <消息>"));
 
         System.out.println();
         if (failures.isEmpty()) {
