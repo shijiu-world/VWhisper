@@ -14,6 +14,10 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.server.ServerInfo;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.slf4j.Logger;
 
 import java.io.InputStream;
@@ -116,6 +120,11 @@ public class ServiceTest {
                 }
             }
             return n;
+        }
+
+        /** 最后收到的那条 —— 拿来检查颜色/结构。 */
+        Component last() {
+            return inbox.isEmpty() ? null : inbox.get(inbox.size() - 1);
         }
 
         void clear() {
@@ -441,6 +450,56 @@ public class ServiceTest {
         check("有 vwhisper.msg.color 的人：真的上色了", hasColor(bob));
         reconfig(defaultOverrides());
 
+        // ---- 8b. #message# 前面的颜色码要能带到消息身上 ----
+        // 消息是模板解析结果的「兄弟节点」，兄弟之间不继承；&7 #message# 里的 &7 其实只染了那个空格。
+        // 所以要把 #message# 落点上的样式探出来、当成消息的父组件带过去。
+        final Map<String, Object> grey = defaultOverrides();
+        grey.put("format.receiver", "&8[&7#sender#&8]&r&7 #message#");
+        reconfig(grey);
+        bob.clear();
+        service.send(alice.source, "Bob", "灰的");
+        check("&7 写在 #message# 前面：消息跟着变灰",
+                NamedTextColor.GRAY.equals(effectiveColor(bob.last(), "灰的")));
+        check("  并且模板本身照旧是深灰的",
+                NamedTextColor.DARK_GRAY.equals(effectiveColor(bob.last(), "[")));
+
+        final Map<String, Object> reset = defaultOverrides();
+        reset.put("format.receiver", "&8[&7#sender#&8]&r #message#");
+        reconfig(reset);
+        bob.clear();
+        service.send(alice.source, "Bob", "默认色");
+        check("&r 之后没再指定颜色：消息不带颜色（客户端默认白，跟老行为一致）",
+                effectiveColor(bob.last(), "默认色") == null);
+
+        final Map<String, Object> tight = defaultOverrides();
+        tight.put("format.receiver", "&7#message#");
+        reconfig(tight);
+        bob.clear();
+        service.send(alice.source, "Bob", "紧贴着");
+        check("颜色码紧贴 #message#（中间没字符）也吃得到",
+                NamedTextColor.GRAY.equals(effectiveColor(bob.last(), "紧贴着")));
+
+        final Map<String, Object> bold = defaultOverrides();
+        bold.put("format.receiver", "&7&o#message#");
+        reconfig(bold);
+        bob.clear();
+        service.send(alice.source, "Bob", "斜的");
+        check("装饰（&o）也一起带过去",
+                NamedTextColor.GRAY.equals(effectiveColor(bob.last(), "斜的"))
+                        && TextDecoration.State.TRUE == effectiveDecoration(bob.last(), "斜的",
+                        TextDecoration.ITALIC));
+
+        // 模板给了底色，但消息里玩家自己写了颜色 —— 玩家的要赢
+        final Map<String, Object> both = defaultOverrides();
+        both.put("format.receiver", "&7#message#");
+        both.put("colors.mode", "parse");
+        reconfig(both);
+        bob.clear();
+        service.send(painter.source, "Bob", "&c红的");
+        check("消息里玩家自己写的 &c 盖掉模板的灰色",
+                NamedTextColor.RED.equals(effectiveColor(bob.last(), "红的")));
+        reconfig(defaultOverrides());
+
         // ---- 9. 走一遍 /msg 命令：权限闸门 ----
         final Map<String, Object> strict = defaultOverrides();
         strict.put("permissions.allow-by-default", Boolean.FALSE);
@@ -527,6 +586,53 @@ public class ServiceTest {
             failures.forEach(f -> System.out.println("   - " + f));
             System.exit(1);
         }
+    }
+
+    /**
+     * 按「客户端的继承规则」算出含 needle 的那个节点实际显示成什么颜色。
+     *
+     * <p>adventure 的组件是树，父组件的样式往下传，子节点自己设了就盖掉 —— 客户端也是这么画的。
+     * 只盯某一个节点的 {@code color()} 是不够的，必须一路把父级的带下来。
+     */
+    private static TextColor effectiveColor(final Component root, final String needle) {
+        return effectiveColor(root, needle, null);
+    }
+
+    private static TextColor effectiveColor(final Component node, final String needle, final TextColor inherited) {
+        final TextColor mine = node.color() != null ? node.color() : inherited;
+        if (node instanceof TextComponent && ((TextComponent) node).content().contains(needle)) {
+            return mine;
+        }
+        for (final Component child : node.children()) {
+            final TextColor found = effectiveColor(child, needle, mine);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    /** 同上，但看的是某个装饰（斜体、粗体…）有没有被打开。 */
+    private static TextDecoration.State effectiveDecoration(final Component root, final String needle,
+                                                            final TextDecoration decoration) {
+        return effectiveDecoration(root, needle, decoration, TextDecoration.State.NOT_SET);
+    }
+
+    private static TextDecoration.State effectiveDecoration(final Component node, final String needle,
+                                                            final TextDecoration decoration,
+                                                            final TextDecoration.State inherited) {
+        final TextDecoration.State own = node.decoration(decoration);
+        final TextDecoration.State mine = own == TextDecoration.State.NOT_SET ? inherited : own;
+        if (node instanceof TextComponent && ((TextComponent) node).content().contains(needle)) {
+            return mine;
+        }
+        for (final Component child : node.children()) {
+            final TextDecoration.State found = effectiveDecoration(child, needle, decoration, mine);
+            if (found == TextDecoration.State.TRUE) {
+                return found;
+            }
+        }
+        return TextDecoration.State.NOT_SET;
     }
 
     private static boolean hasColor(final Fake fake) {

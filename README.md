@@ -19,7 +19,7 @@
 
 ## 安装
 
-1. `vwhisper-1.0.0.jar` 丢进代理的 `plugins/` 目录
+1. `vwhisper-1.0.1.jar` 丢进代理的 `plugins/` 目录
 2. 启动代理一次，会自动生成 `plugins/vwhisper/config.toml`
 3. 改完配置用 `/vw reload`（控制台直接敲也行）
 
@@ -126,6 +126,20 @@ LuckPerms 里通常这么给：
 
 `[messages]` 里的提示语还能用 `#label#`，会换成实际的命令名（`/vw`）—— 改了别名不用逐条改文本。
 
+### 消息内容显示成什么颜色
+
+`#message#` 前面的那个颜色码会**带**给消息本身：
+
+```toml
+sender = "&8[&7我 &8→ &7#target#&8]&r&7 #message#"   # 消息是灰的
+sender = "&8[&7我 &8→ &7#target#&8]&r #message#"     # 消息不带颜色 → 客户端默认白色
+```
+
+- 带过去的是「底色」：消息里玩家自己写的 `&c`、渐变照旧盖掉它，不会串色。
+- 颜色码后面哪怕一个字都没有（`&7#message#`）也一样有效 —— 不用为了生效硬塞个空格。
+- 装饰（`&l` `&o`…）跟着一起带过去。
+- 想让消息回到客户端默认色，就在 `#message#` 前留一个 `&r`（有空格也行），别再跟颜色码。
+
 > 没有称号/前缀/`%xxx%` 之类的占位符：私聊是代理绕过子服直接发的，子服的 PlaceholderAPI
 > 变量在代理端拿不到，硬要就要额外装 PAPIProxyBridge 并多一次跨服往返 —— 不值。
 > 想让称号出现在聊天里是子服那边 `Chat.GeneralFormat` 的事，这里不掺和。
@@ -180,7 +194,7 @@ cd D:\Code\mc\plugins\VWhisper
 JAVA_HOME=D:/Code/Java/zulu25.34.17-ca-jdk25.0.3-win_x64 mvn -B -o clean package
 ```
 
-产物：`target/vwhisper-1.0.0.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
+产物：`target/vwhisper-1.0.1.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
 
 > 构建为什么必须零依赖：本机 Maven 是离线的，装不上 maven-shade 插件，打不进第三方库，
 > 所以连 TOML 解析都是自己写的（`TomlLite`，~300 行，格式写错也只是取到默认值，不会把插件搞挂）。

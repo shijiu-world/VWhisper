@@ -10,7 +10,7 @@
 
 - 源码：`D:\Code\mc\plugins\VWhisper`
 - 仓库：`git@github.com:shijiu-world/VWhisper.git`（**走 SSH**，https 会被本机代理掐断 502）
-- 产物：`target/vwhisper-1.0.0.jar`（class 61，Velocity 3.4+ ~ 4.x 通用）
+- 产物：`target/vwhisper-1.0.1.jar`（class 61，Velocity 3.4+ ~ 4.x 通用）
 - 主命令 `/vwhisper`，默认别名 `/vw`；顶层快捷命令接管 `/msg` `/w` `/m` `/tell` `/whisper` `/reply` `/r`
 
 ---
@@ -24,7 +24,7 @@
 | 文件 | 行 | 职责 | 备注 |
 |---|---|---|---|
 | `VWhisper.java` | 260 | 主类。注册命令/快捷命令、自动重载、起服打配置报告 | `registerShortcuts()` 把 `[shortcuts]` 注册成**顶层命令**；`onDisconnect` 清 reply 记忆 |
-| `WhisperService.java` | 305 | **核心业务**：找人、闸门检查、投递、渲染 | `send()` 是主入口，`deliver()` 真正发消息 |
+| `WhisperService.java` | 401 | **核心业务**：找人、闸门检查、投递、渲染 | `send()` 是主入口，`deliver()` 真正发消息；渲染的样式继承看下面「颜色继承」 |
 | `Configuration.java` | 369 | 全部配置读取，`LoadResult` 携带错误原因 | 加载失败**保留旧配置** |
 | `Store.java` | 223 | 内存态 + 落盘：屏蔽名单、接收开关、spy、reply 记忆 | 文件 `plugins/vwhisper/ignores.txt`、`toggles.txt` |
 | `Permissions.java` | 89 | 权限闸门。`allow-by-default` 只影响 4 个基础节点 | 特权节点（spy/reload/bypass/color）一律要显式给 |
@@ -88,6 +88,42 @@
 
 ---
 
+## 🔴 颜色继承：`#message#` 是兄弟节点，不是子节点
+
+`render()` 的做法是：先替换占位符 → 按 `#message#` 切开 → 每段各自解析成组件 →
+**消息组件和这些段是平级的兄弟**，一起挂到同一个空根节点下。
+
+于是有个反直觉的坑：
+
+```text
+模板   &8[&7我&8]&r&7 #message#
+解析   root(text "") ─┬─ head: [ "["灰黑, "我"灰, "]"灰黑, " "灰 ]
+                      └─ message: text("你好") color=null   ← 兄弟！继承不到那个 &7
+```
+
+adventure 的样式只从**父**往下传，兄弟之间不传。`&7` 只染了它后面那一个空格，
+消息自己没颜色 → 客户端回落到默认白。**配置里怎么调都调不出来，必须代码里处理。**
+
+目前的解法（`WhisperService` 里三个小方法）：
+
+| 方法 | 干什么 |
+| --- | --- |
+| `styleAt(config, text)` | 在 text 尾巴接一个探针字符 `U+E002` 再解析，找到含探针的节点读它的 `Style` |
+| `carry(message, style)` | 包一层空文本的**父**组件带上这个样式（颜色 + 装饰 + 字体） |
+| `walk(root, visitor)` | 迭代式深搜，找探针节点 |
+
+为什么要探针：颜色码只作用于它后面的字符，`&7#message#` 这种「紧贴」写法解析出来
+压根没有落点节点，光看解析结果问不出颜色。探针保证一定有落点，且正好落在消息的位置上。
+
+为什么用父组件包一层而不是直接改消息：子组件上显式设了的值会盖掉父组件传下来的 ——
+这样消息里玩家自己写的 `&c` 照旧赢，只填「没设」的洞。
+
+⚠️ 探针字符要和 `ChatColors` 里渐变用的哨兵（`U+E000`/`U+E001`）错开。
+⚠️ `&r` 之后没跟颜色码 → 探到的是空样式 → `carry` 原样返回 → 消息保持客户端默认（白），
+   老行为不变（随包默认配置就是 `&r #message#`）。
+
+---
+
 ## 改动地图
 
 | 想改什么 | 改哪 | 连带要动 |
@@ -96,6 +132,7 @@
 | 加子命令 | `command/` 新类 + `RootCommand` 的 `Entry` 表 | `[commands]` 段、`[shortcuts]`（可选）、help 文案 |
 | 加/改提示语 | `config.toml` 的 `[messages]` | `#label#` 会自动换成实际命令名，别硬写 `/vw` |
 | 颜色/渐变语法 | `ChatColors.java` | ⚠️ Vmessage 有一份独立拷贝，两边都要改 |
+| `#message# 的颜色/装饰怎么带 | `WhisperService.styleAt/carry/walk` | 见上节。`parse()` 解析失败会退成纯文本，探针也会跟着退化 → 拿不到样式 → 兜底不染色，不会炸 |
 | 权限判定 | `Permissions.java` | 注意 `allow-by-default` 只覆盖 4 个基础节点 |
 | 存盘格式 | `Store.java` | 纯文本一行一条 UUID，肉眼可读；改格式要考虑旧文件兼容 |
 | 自聊相关 | `WhisperService.send()` ③⑤⑥ + `deliver()` | 自聊有 4 条特殊规则（见铁律 9），分散在两个方法里，改一处容易漏另一处 |
@@ -129,7 +166,7 @@ $out = "D:\tmp\vwtest"
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
 | `SmokeTest` | 49 | TOML 解析、颜色/渐变渲染。**必须传 `target/classes/config.toml` 作 `args[0]`** |
-| `ServiceTest` | 51 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全 |
+| `ServiceTest` | 57 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**#message# 的样式继承** |
 | `ClasspathTest` | 3 | 隔离 ClassLoader 只加载 velocity jar + 本项目 classes，验证工具类可加载，**并反向验证旧写法在同一环境确实挂**（否则这测试是自欺欺人） |
 
 ---
@@ -143,7 +180,7 @@ $out = "D:\tmp\vwtest"
 | LuckPerms | **不是硬依赖**。权限走 Velocity 原生 `CommandSource#getPermissionValue`，谁提供权限都行 |
 | PAPIProxyBridge | **不依赖、不用装** |
 
-⚠️ 上线状态：`vwhisper-1.0.0.jar` 已在本地测试服 `D:\game\test_velocity\velocity\plugins\` 就位，
+⚠️ 上线状态：`vwhisper-1.0.1.jar` 已在本地测试服 `D:\game\test_velocity\velocity\plugins\` 就位，
 **线上尚未部署**。
 
 ---
@@ -157,3 +194,4 @@ $out = "D:\tmp\vwtest"
 | 子服 CMI 的 `/msg` 失效了 | **这是故意的**。代理注册了 `/msg` 就不往后端转发。想要子服自己的就把 `[shortcuts]` 那行删掉重启 |
 | 改了别名不生效 | 命令起服时注册，要重启代理 |
 | 控制台日志乱码/吃字 | `PlainText.of()` 递归有问题，检查 `TextComponent.content()` 之外有没有漏 translatable/score 等组件类型 |
+| 消息内容颜色不对（配了 `&7 #message#` 还是白的） | 先看是不是踩了上面「颜色继承」那节：消息是兄弟节点。已经修好了，若还不对就查 `styleAt()` 探到的样式是不是空（用探针单独打一遍） |

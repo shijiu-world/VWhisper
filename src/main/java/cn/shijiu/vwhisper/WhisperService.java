@@ -7,14 +7,20 @@ import net.kyori.adventure.key.Key;
 import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.format.Style;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.slf4j.Logger;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * 私聊的核心：查人、各种拦路闸门，以及三种身份看到的三份渲染。
@@ -23,6 +29,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * 后端服务器压根不知道有这条消息，人在哪个服都收得到。真正的活儿都在「谁该看、谁不该看」上。
  */
 public final class WhisperService {
+
+    /**
+     * 样式探针：一个玩家打不出来的私用字符，用来问出 {@code #message#} 落点上的颜色。
+     * 跟 {@link ChatColors} 里渐变用的哨兵（{@code U+E000}/{@code U+E001}）错开，互不干扰。
+     */
+    private static final char PROBE_CHAR = '\uE002';
+    private static final String PROBE = String.valueOf(PROBE_CHAR);
 
     private final VWhisper plugin;
     private final ProxyServer proxy;
@@ -272,11 +285,81 @@ public final class WhisperService {
         final TextComponent.Builder builder = Component.text();
         for (int i = 0; i < parts.length; i++) {
             if (i > 0) {
-                builder.append(message);
+                // 模板里写在 #message# 前面的那个颜色码（&7 #message#）只染到了它自己那几个字符，
+                // 消息是另一个兄弟节点，继承不到。所以把那个样式「带」给消息 —— 见 carry()。
+                builder.append(carry(message, styleAt(config, parts[i - 1])));
             }
             builder.append(parse(config, parts[i]));
         }
         return builder.build();
+    }
+
+    /**
+     * 把 style 当成消息的「底色」：包一层空文本的父组件。
+     *
+     * <p>走父组件而不是直接改消息本身，是为了让消息里玩家自己写的颜色照旧生效 ——
+     * 子组件上显式设了的值会盖掉父组件传下来的，没设的才继承。
+     *
+     * @param style {@link #styleAt} 探到的样式；null 或空样式表示「没什么可带」，原样返回
+     */
+    private static Component carry(final Component message, final Style style) {
+        if (style == null) {
+            return message;
+        }
+        final TextComponent.Builder wrapper = Component.text();
+        boolean any = false;
+        if (style.color() != null) {
+            wrapper.color(style.color());
+            any = true;
+        }
+        if (style.font() != null) {
+            wrapper.font(style.font());
+            any = true;
+        }
+        for (final TextDecoration decoration : TextDecoration.values()) {
+            final TextDecoration.State state = style.decoration(decoration);
+            if (state != TextDecoration.State.NOT_SET) {
+                wrapper.decoration(decoration, state);
+                any = true;
+            }
+        }
+        return any ? wrapper.append(message).build() : message;
+    }
+
+    /**
+     * 问出「这段模板结尾处生效的是什么样式」。
+     *
+     * <p>做法是在尾巴上接一个探针字符再解析，然后找到含探针的那个节点读它的样式。
+     * 为什么要这么绕：颜色码只作用于它后面的字符，模板最后一个颜色码后面如果是空的
+     * （比如写 {@code &7#message#}），解析出来压根没有那个节点，光看结果问不出来。
+     * 探针保证一定有个落点，而且它落在 #message# 的位置上，拿到的就是消息该有的样式。
+     *
+     * @return 结尾处的样式；探针没找到（理论上不会）就返回 null
+     */
+    private Style styleAt(final Configuration config, final String text) {
+        final Component parsed = parse(config, text + PROBE);
+        final Style[] found = new Style[1];
+        walk(parsed, component -> {
+            if (found[0] == null && component instanceof TextComponent
+                    && ((TextComponent) component).content().indexOf(PROBE_CHAR) >= 0) {
+                found[0] = component.style();
+            }
+        });
+        return found[0];
+    }
+
+    /** 深一层层往下走，每个节点都交给 visitor —— 比递归好写，也不用担心环。 */
+    private static void walk(final Component root, final Consumer<Component> visitor) {
+        final Deque<Component> stack = new ArrayDeque<>();
+        stack.push(root);
+        while (!stack.isEmpty()) {
+            final Component current = stack.pop();
+            visitor.accept(current);
+            final List<Component> children = current.children();
+            for (int i = children.size() - 1; i >= 0; i--) {
+                stack.push(children.get(i));
+            }
+        }
     }
 
     private Component parse(final Configuration config, final String text) {

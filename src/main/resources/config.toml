@@ -61,12 +61,18 @@ mode = "parse"
 #   #sender-server#   发送者所在服    #target-server#   接收者所在服
 #   #message#         消息内容（永远放在最后）
 # 控制台群发 /msg 时，#sender# = 控制台、#sender-server# = console
+#
+# ⚠️ 紧挨着 #message# 前面的那个颜色码会「带」给消息内容本身：
+#       "...&8]&r&7 #message#"  → 消息是灰的
+#       "...&8]&r #message#"    → 消息不带颜色，客户端按默认（白）显示
+#    带过去的只是「底色」：消息里玩家自己写的 &c 之类照旧盖掉它。
+#    颜色码后面哪怕一个字都没有（写成 &7#message#）也一样有效。
 # ------------------------------------------------------------
 [format]
 minimessage = false
-sender = "&8[&7我 &8→ &7#target#&8]&r #message#"
-receiver = "&8[&7#sender# &8→ &7我&8]&r #message#"
-spy = "&8[&7#sender# &8→ &7#target#&8]&r #message#"
+sender = "&8[&7我 &8→ &7#target#&8]&r&7 #message#"
+receiver = "&8[&7#sender# &8→ &7我&8]&r&7 #message#"
+spy = "&8[&7#sender# &8→ &7#target#&8]&r&7 #message#"
 # 从控制台发出的那一份（发给玩家看的）
 console = "&8[&c控制台 &8→ &7我&8]&r #message#"
 
