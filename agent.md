@@ -10,7 +10,7 @@
 
 - 源码：`D:\Code\mc\plugins\VWhisper`
 - 仓库：`git@github.com:shijiu-world/VWhisper.git`（**走 SSH**，https 会被本机代理掐断 502）
-- 产物：`target/vwhisper-1.0.1.jar`（class 61，Velocity 3.4+ ~ 4.x 通用）
+- 产物：`target/vwhisper-1.0.2.jar`（class 61，Velocity 3.4+ ~ 4.x 通用）
 - 主命令 `/vwhisper`，默认别名 `/vw`；顶层快捷命令接管 `/msg` `/w` `/m` `/tell` `/whisper` `/reply` `/r`
 
 ---
@@ -184,7 +184,7 @@ $out = "D:\tmp\vwtest"
 | LuckPerms | **不是硬依赖**。权限走 Velocity 原生 `CommandSource#getPermissionValue`，谁提供权限都行 |
 | PAPIProxyBridge | **不依赖、不用装** |
 
-⚠️ 上线状态：`vwhisper-1.0.1.jar` 已在本地测试服 `D:\game\test_velocity\velocity\plugins\` 就位，
+⚠️ 上线状态：`vwhisper-1.0.2.jar` 已在本地测试服 `D:\game\test_velocity\velocity\plugins\` 就位，
 **线上尚未部署**。
 
 ---

@@ -19,7 +19,7 @@
 
 ## 安装
 
-1. `vwhisper-1.0.1.jar` 丢进代理的 `plugins/` 目录
+1. `vwhisper-1.0.2.jar` 丢进代理的 `plugins/` 目录
 2. 启动代理一次，会自动生成 `plugins/vwhisper/config.toml`
 3. 改完配置用 `/vw reload`（控制台直接敲也行）
 
@@ -194,7 +194,7 @@ cd D:\Code\mc\plugins\VWhisper
 JAVA_HOME=D:/Code/Java/zulu25.34.17-ca-jdk25.0.3-win_x64 mvn -B -o clean package
 ```
 
-产物：`target/vwhisper-1.0.1.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
+产物：`target/vwhisper-1.0.2.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
 
 > 构建为什么必须零依赖：本机 Maven 是离线的，装不上 maven-shade 插件，打不进第三方库，
 > 所以连 TOML 解析都是自己写的（`TomlLite`，~300 行，格式写错也只是取到默认值，不会把插件搞挂）。
