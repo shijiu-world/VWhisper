@@ -2,6 +2,8 @@ package cn.shijiu.vwhisper;
 
 import org.slf4j.Logger;
 
+import net.kyori.adventure.key.Key;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -23,6 +25,9 @@ import java.util.Map;
  */
 public final class Configuration {
 
+    /** 默认提示音 —— 配错了（或留空）就退回它。 */
+    private static final String DEFAULT_SOUND = "minecraft:entity.experience_orb.pickup";
+
     /** 加载结果：config 可能为旧的（出错时），error 不为空说明这次没能读成。 */
     public static final class LoadResult {
         final Configuration config;
@@ -43,8 +48,7 @@ public final class Configuration {
     }
 
     // ---------------- 服务器名单 ----------------
-    private final ServerFilter filter;
-    // ---------------- 颜色 ----------------
+    private final ServerFilter filter;    // ---------------- 颜色 ----------------
     private final boolean allowByDefault;
     private final String colorMode;
     // ---------------- 格式 ----------------
@@ -108,7 +112,10 @@ public final class Configuration {
 
         this.cooldownSeconds = Math.max(0L, TomlLite.integer(m, "cooldown.seconds", 0L));
         this.soundEnabled = TomlLite.bool(m, "sound.enabled", true);
-        this.soundName = TomlLite.string(m, "sound.name", "minecraft:entity.experience_orb.pickup").trim();
+        // ⚠️ 音效 id 起服就校验：Key.key() 拒绝大写字母 / 空格 / 非法符号，写歪了会
+        //    每发一条私聊抛一次异常。以前是等到 runtime 才炸，还连带吞掉 reply 记忆。
+        final String sound = TomlLite.string(m, "sound.name", DEFAULT_SOUND).trim();
+        this.soundName = validKey(sound) ? sound : DEFAULT_SOUND;
         this.soundVolume = (float) TomlLite.decimal(m, "sound.volume", 1.0D);
         this.soundPitch = (float) TomlLite.decimal(m, "sound.pitch", 1.0D);
 
@@ -166,7 +173,14 @@ public final class Configuration {
         }
     }
 
-    /** 用 jar 里自带的默认 config.toml 造一份配置 —— 连内置模板都读不出来时的兜底。 */
+    /**
+     * 用 jar 里自带的默认 config.toml 造一份配置。
+     *
+     * <p>⚠️ 这个方法是在插件**构造函数**里调的，以前读不出来就抛
+     * {@code IllegalStateException}，结果插件连加载都不成功、连一句日志都没有。
+     * 其实构造函数里每个取值都写了默认值，拿张空表也能造出一份完整配置，
+     * 所以这里失败时兜底返回内置默认 —— 保住「先起来再说」。
+     */
     public static Configuration defaults() {
         try (InputStream in = Configuration.class.getClassLoader().getResourceAsStream("config.toml")) {
             if (in == null) {
@@ -174,7 +188,7 @@ public final class Configuration {
             }
             return new Configuration(TomlLite.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8)));
         } catch (final Exception e) {
-            throw new IllegalStateException("连默认配置都读不出来：" + e, e);
+            return new Configuration(Collections.emptyMap());
         }
     }
 
@@ -249,6 +263,23 @@ public final class Configuration {
             text = text.replace("#label#", label());
         }
         return prefix + text;
+    }
+
+    /**
+     * 这个字符串能不能当 adventure 的 {@code Key} 用。
+     *
+     * <p>{@code Key.key()} 要求 {@code [a-z0-9_.-]}: （不允许大写、空格），
+     * 从 wiki 上抄一个带大写的 id 下来就会抛 {@code InvalidKeyException}。
+     */
+    private static boolean validKey(final String candidate) {
+        if (candidate == null || candidate.isEmpty()) {
+            return false;
+        }
+        try {
+            return !Key.key(candidate).asString().isEmpty();
+        } catch (final Throwable t) {
+            return false;
+        }
     }
 
     /** 提示语里显示成什么命令名 —— 取配置的第一个主命令别名，没配就用 /vwhisper。 */

@@ -124,7 +124,9 @@ public final class RootCommand implements SimpleCommand {
             }
             return out;
         }
-        final Entry entry = resolve(args[0]);
+        // ⚠️ 跟 execute() 一样先把子命令名小写 —— 否则 /vw MSG <Tab> 补不出来，
+        //    而同样的命令敲下去倒是能执行，行为不一致。
+        final Entry entry = resolve(args[0].toLowerCase(Locale.ROOT));
         if (entry == null) {
             return List.of();
         }

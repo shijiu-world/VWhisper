@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
@@ -44,7 +45,9 @@ public final class WhisperService {
     /** 上一次发消息的时刻，用来算冷却。 */
     private final Map<UUID, Long> lastSent = new ConcurrentHashMap<>();
     /** 组件反序列化失败只报一次，别每条私聊都刷屏。 */
-    private boolean warnedParse;
+    private volatile boolean warnedParse;
+    /** 提示音放不出来（多半是 sound.name 写歪了）也只报一次。 */
+    private volatile boolean warnedSound;
 
     public WhisperService(final VWhisper plugin, final ProxyServer proxy, final Logger logger, final Store store) {
         this.plugin = plugin;
@@ -161,7 +164,7 @@ public final class WhisperService {
         if (sender != null && !checkCooldown(source, sender, config)) {
             return false;
         }
-        deliver(source, sender, target, rawMessage);
+        deliver(config, source, sender, target, rawMessage);
         return true;
     }
 
@@ -171,23 +174,39 @@ public final class WhisperService {
             lastSent.put(sender.getUniqueId(), System.currentTimeMillis());
             return true;
         }
-        final Long last = lastSent.get(sender.getUniqueId());
-        if (last == null) {
-            lastSent.put(sender.getUniqueId(), System.currentTimeMillis());
-            return true;
+        // ⚠️ 「看一眼旧的 + 再写新的」必须是原子的一步：拆成 get / put 两步时，
+        //    两条并发的 /msg 会同时判定「已经过了冷却」，冷却等于没配。
+        final long now = System.currentTimeMillis();
+        final AtomicLong remain = new AtomicLong();
+        lastSent.compute(sender.getUniqueId(), (uuid, last) -> {
+            if (last == null || now - last >= seconds * 1000L) {
+                remain.set(0L);
+                return now;
+            }
+            remain.set(seconds - (now - last) / 1000L);
+            return last;
+        });
+        if (remain.get() > 0L) {
+            plugin.send(source, config.message("cooldown", "seconds", remain.get()));
+            return false;
         }
-        final long elapsed = (System.currentTimeMillis() - last) / 1000L;
-        if (elapsed >= seconds) {
-            lastSent.put(sender.getUniqueId(), System.currentTimeMillis());
-            return true;
-        }
-        plugin.send(source, config.message("cooldown", "seconds", seconds - elapsed));
-        return false;
+        return true;
     }
 
-    /** 一切检查都过了，真的发。 */
-    private void deliver(final CommandSource source, final Player sender, final Player target, final String raw) {
-        final Configuration config = plugin.configuration();
+    /** 下线清掉这个人的冷却记录 —— 否则每个发过言的玩家都会在这里永久留一条。 */
+    public void forget(final UUID uuid) {
+        lastSent.remove(uuid);
+    }
+
+    /**
+     * 一切检查都过了，真的发。
+     *
+     * @param config {@code send()} 阶段用过的**同一份**配置快照。以前这里重新读一次
+     *               {@code plugin.configuration()}，于是一条消息会按「旧配置放行、
+     *               新配置渲染」混着跑（reload 恰好插在中间时尤为明显）。
+     */
+    private void deliver(final Configuration config, final CommandSource source, final Player sender,
+                         final Player target, final String raw) {
         final String mode = Permissions.has(source, Permissions.MSG_COLOR, false)
                 ? "parse" : config.colorMode();
         // 渐变不单独要权限：跟着 mode 走，跟 &c 一个待遇
@@ -215,10 +234,9 @@ public final class WhisperService {
             target.sendMessage(toTarget);
         }
 
-        if (config.soundEnabled()) {
-            target.playSound(Sound.sound(Key.key(config.soundName()), Sound.Source.PLAYER,
-                    config.soundVolume(), config.soundPitch()));
-        }
+        // ⚠️ 提示音放在最后：以前它夹在中间，一旦 Key.key() 因为名字非法抛异常，
+        //    后面的 reply 记忆 / 窥屏 / 控制台日志就整段不执行了（消息本体倒已经发出去）。
+        playSound(config, target);
 
         // /reply 记忆：双方都记，谁都能接着 /r。
         // ⚠️ 自言自语不记 —— 否则 /r 会指向自己，再也回不到上一个真正聊过的人
@@ -234,6 +252,27 @@ public final class WhisperService {
         if (config.logToConsole()) {
             logger.info("[vwhisper] " + senderName + " -> " + target.getUsername() + ": "
                     + PlainText.of(message));
+        }
+    }
+
+    /**
+     * 给对方放个提示音。
+     *
+     * <p>音效 id 写歪（大写字母、空格、非法符号）时 {@code Key.key()} 会抛异常，
+     * 「叮」一声没响不值得搭上整条消息的后半段，所以这里吃掉并只报一次。
+     */
+    private void playSound(final Configuration config, final Player target) {
+        if (!config.soundEnabled()) {
+            return;
+        }
+        try {
+            target.playSound(Sound.sound(Key.key(config.soundName()), Sound.Source.PLAYER,
+                    config.soundVolume(), config.soundPitch()));
+        } catch (final Throwable ex) {
+            if (!warnedSound) {
+                logger.warn("[vwhisper] 提示音放不出来（检查 sound.name 是不是合法的音效 id）：" + ex);
+                warnedSound = true;
+            }
         }
     }
 

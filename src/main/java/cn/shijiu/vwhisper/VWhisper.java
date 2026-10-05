@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -72,11 +73,12 @@ public final class VWhisper {
                 + " msg（别名可在 [commands] 里改）。子服不用装任何东西。");
     }
 
-    /** 有人下线：把 /reply 记忆、窥屏状态都清掉，别占着内存也别留下"还能回复"的假象。 */
+    /** 有人下线：把 /reply 记忆、窥屏状态、冷却表都清掉，别占着内存也别留下"还能回复"的假象。 */
     @Subscribe
     public void onDisconnect(final DisconnectEvent event) {
-        final Player player = event.getPlayer();
-        store.forget(player.getUniqueId());
+        final UUID uuid = event.getPlayer().getUniqueId();
+        store.forget(uuid);
+        service.forget(uuid);
     }
 
     // ------------------------------------------------------------------
@@ -138,10 +140,20 @@ public final class VWhisper {
 
     private void register(final String name, final SimpleCommand command, final List<String> aliases) {
         // ⚠️ 主名一律小写：Velocity 底层走 Brigadier，literal 节点大小写敏感，
-        //    注册成大写的话，敲小写会"命令不存在"，还会被转发给后端
+        //    注册成大写的话，敲小写会"命令不存在"，还会被转发给后端。
+        //    [commands] root 那条路径以前漏了这一步 —— 配成 root = ["VW"] 时，
+        //    注册的是 /VW，玩家敲 /vw 反而被当成未知命令丢给子服。
         final CommandManager manager = proxy.getCommandManager();
-        final CommandMeta meta = manager.metaBuilder(name)
-                .aliases(aliases.toArray(new String[0]))
+        final String main = name.toLowerCase(Locale.ROOT);
+        final List<String> lower = new ArrayList<>();
+        for (final String alias : aliases) {
+            final String each = alias == null ? "" : alias.toLowerCase(Locale.ROOT);
+            if (!each.isEmpty() && !each.equals(main) && !lower.contains(each)) {
+                lower.add(each);
+            }
+        }
+        final CommandMeta meta = manager.metaBuilder(main)
+                .aliases(lower.toArray(new String[0]))
                 .plugin(this)
                 .build();
         manager.register(meta, command);
@@ -156,6 +168,10 @@ public final class VWhisper {
         final Configuration.LoadResult result = Configuration.load(dataDirectory, logger);
         if (result.error() != null) {
             logger.warn("[vwhisper] config.toml 没读出来，继续用旧配置：" + result.error());
+            // ⚠️ 读失败也要把 mtime 记账往前推：不然自动重载每 3 秒重试一次、
+            //    每 3 秒一条 WARN，把「留着旧配置凑合」的容错变成日志洪水。
+            //    管理员把文件改好时 mtime 会再变，届时自然会重载。
+            lastModified = configMtime();
             if (feedback != null) {
                 send(feedback, config.message("reload-failed", "reason", result.error()));
             }

@@ -165,9 +165,13 @@ $out = "D:\tmp\vwtest"
 
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
-| `SmokeTest` | 49 | TOML 解析、颜色/渐变渲染。**必须传 `target/classes/config.toml` 作 `args[0]`** |
-| `ServiceTest` | 57 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**#message# 的样式继承** |
+| `SmokeTest` | 56 | TOML 解析（含**无引号值的行尾注释、多行数组、段名行带注释的 `]`**）、颜色/渐变渲染。**必须传 `target/classes/config.toml` 作 `args[0]`** |
+| `ServiceTest` | 67 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`/`ToggleCommand`：权限闸门、接收开关（**含 `/vw toggle on` 方向**）、屏蔽与**存盘往返**、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**#message# 的样式继承** |
 | `ClasspathTest` | 3 | 隔离 ClassLoader 只加载 velocity jar + 本项目 classes，验证工具类可加载，**并反向验证旧写法在同一环境确实挂**（否则这测试是自欺欺人） |
+
+> ⚠️ 写新用例时**测完要把状态还原**（例如 `toggleIgnore` 加了就要撤掉）：
+> 这些用例共享同一批玩家与同一个 `Store`，后面还有颜色之类的用例，
+> 一旦留下「Bob 屏蔽了 Alice」这种残留，后面的用例会以奇怪的方式炸掉。
 
 ---
 

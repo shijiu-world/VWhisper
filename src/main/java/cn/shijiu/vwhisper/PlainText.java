@@ -14,8 +14,12 @@ import net.kyori.adventure.text.TextComponent;
  *
  * <p>插件的 classpath 只包含 Velocity 自己带的那些类，而 {@code adventure-api} 里
  * 能安全遍历组件的就两个：{@link Component#children()} 和 {@link TextComponent#content()}。
- * 递归走一遍就够 —— 本插件的消息都是自己构造的文本组件树，不会有
- * translatable / NBT 这类需要额外解析的类型。
+ * 递归走一遍就够。除了 {@link TextComponent#content()}，还要顺手照顾
+ * {@code TranslatableComponent} / {@code KeybindComponent} / {@code ScoreComponent} /
+ * {@code SelectorComponent} —— 它们的文本挂在自身字段上、不在 {@code children()} 里，
+ * 开了 {@code format.minimessage} 之后模板就可能产生这类节点。
+ *
+ * <p>（这几个类都在 adventure-api 里，Velocity 的运行 jar 带它，安全。）
  *
  * <p>📌 通用教训：给 Velocity 写插件，凡是 <em>编译能过</em> 不代表 <em>运行就有</em>。
  * 用到了边界上的类（各种 serializer、非常规 artifact）先去 {@code velocity-*.jar} 里
@@ -39,6 +43,16 @@ public final class PlainText {
     private static void append(final StringBuilder sb, final Component c) {
         if (c instanceof TextComponent) {
             sb.append(((TextComponent) c).content());
+        } else if (c instanceof net.kyori.adventure.text.TranslatableComponent) {
+            // MiniMessage 模式下可能有这些节点：它们的文本在自身字段里，
+            // 不在 children() 里，只遍历子节点会把它们整段丢掉。
+            sb.append(((net.kyori.adventure.text.TranslatableComponent) c).key());
+        } else if (c instanceof net.kyori.adventure.text.KeybindComponent) {
+            sb.append(((net.kyori.adventure.text.KeybindComponent) c).keybind());
+        } else if (c instanceof net.kyori.adventure.text.ScoreComponent) {
+            sb.append(((net.kyori.adventure.text.ScoreComponent) c).name());
+        } else if (c instanceof net.kyori.adventure.text.SelectorComponent) {
+            sb.append(((net.kyori.adventure.text.SelectorComponent) c).pattern());
         }
         for (final Component child : c.children()) {
             append(sb, child);

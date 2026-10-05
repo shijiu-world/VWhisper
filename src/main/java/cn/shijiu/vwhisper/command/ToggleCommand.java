@@ -9,6 +9,8 @@ import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.proxy.Player;
 
+import java.util.Locale;
+
 /**
  * {@code /msgtoggle} —— 自己要不要收私聊（别名 togglemsg / tmsg）。
  *
@@ -38,8 +40,17 @@ public final class ToggleCommand implements SimpleCommand {
         final Player me = (Player) source;
         final boolean receive;
         if (args.length >= 1) {
-            final String arg = args[0].toLowerCase();
-            receive = arg.equals("off") || arg.equals("false") || arg.equals("关");
+            final String arg = args[0].toLowerCase(Locale.ROOT);
+            if (arg.equals("off") || arg.equals("false") || arg.equals("关") || arg.equals("no")) {
+                receive = false;
+            } else if (arg.equals("on") || arg.equals("true") || arg.equals("开") || arg.equals("yes")) {
+                receive = true;
+            } else {
+                // 认不出来就按「开关」处理。
+                // ⚠️ 别写成「不是 off 就当 off」——那样 /vw toggle on 会真的关掉接收，
+                //    打错一个字也会被静默关掉（这是本插件上线前修掉的一个反向 bug）。
+                receive = !plugin.store().isReceiving(me.getUniqueId());
+            }
         } else {
             receive = !plugin.store().isReceiving(me.getUniqueId());
         }

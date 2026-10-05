@@ -32,9 +32,32 @@ public class SmokeTest {
         check("小数", TomlLite.decimal(map, "sound.volume", 0D) == 1.0D);
         final String selfMsg = TomlLite.string(map, "messages.self-message", "");
         check("带引号的中文提示语", selfMsg.contains("不能给自己发私聊") && !selfMsg.startsWith("\""));
-        // 行尾注释自己造一段来测 —— 别依赖随包配置里恰好有注释（改文案时容易顺手删掉）
         final Map<String, Object> commentProbe = TomlLite.parse("tip = \"&c测试\" # 这是注释\n");
         check("行尾注释不会串进值里", "&c测试".equals(TomlLite.string(commentProbe, "tip", "")));
+        // ⚠️ 没加引号的值 + 行尾注释：以前会把注释一起吞进值里，布尔被 parseBoolean 翻成 false、
+        //    白名单匹配不上就 fail-open —— 全是静默的。这几条专门守着它们。
+        final Map<String, Object> unquoted = TomlLite.parse(
+                "enabled = true # 默认允许\nseconds = 5 # 秒\nmode = whitelist # 白名单\n");
+        check("没加引号的布尔 + 行尾注释仍是 true", TomlLite.bool(unquoted, "enabled", false));
+        check("没加引号的数字 + 行尾注释仍是整数", TomlLite.integer(unquoted, "seconds", 0L) == 5L);
+        check("没加引号的字符串 + 行尾注释不带杂质",
+                "whitelist".equals(TomlLite.string(unquoted, "mode", "?")));
+        check("带引号的值里可以有 ## 和 #abcdef 颜色码",
+                "&#FF0000红".equals(TomlLite.string(
+                        TomlLite.parse("tip = \"&#FF0000红\" # 这是红色的\n"), "tip", "?")));
+        // 多行数组：以前逐行扫描时中间几行没有 = 会被整段丢掉，名单直接变空
+        final Map<String, Object> multiLine = TomlLite.parse(
+                "list = [\n  \"bedwars\",\n  \"killer\",\n]\n");
+        check("多行数组不再被整段丢掉", ((List<?>) multiLine.get("list")).size() == 2
+                && ((List<?>) multiLine.get("list")).contains("bedwars"));
+        // 段名行里带注释的 ]：以前用 lastIndexOf(']') 会抓到注释里那个
+        final Map<String, Object> bracket = TomlLite.parse(
+                "[messages]  # 提示语 [重要]\nself-message = \"&c不能给自己发私聊\"\n");
+        check("段名行注释里的 ] 不会污染前缀",
+                "&c不能给自己发私聊".equals(TomlLite.string(bracket, "messages.self-message", "?")));
+        // 字符串以转义的反斜杠结尾时，收尾引号要认得出来
+        final Map<String, Object> esc = TomlLite.parse("path = \"a\\\\b\"\n");
+        check("转义的反斜杠：引号能正常闭合", "a\\b".equals(TomlLite.string(esc, "path", "?")));
         check("空数组", ((List<?>) map.get("servers.list")).isEmpty());
         check("渐变不再需要单独权限（配置项已删）", !map.containsKey("colors.gradient-permission"));
 

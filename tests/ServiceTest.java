@@ -6,6 +6,7 @@ import cn.shijiu.vwhisper.VWhisper;
 import cn.shijiu.vwhisper.WhisperService;
 import cn.shijiu.vwhisper.command.MsgCommand;
 import cn.shijiu.vwhisper.command.RootCommand;
+import cn.shijiu.vwhisper.command.ToggleCommand;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand.Invocation;
 import com.velocitypowered.api.permission.Tristate;
@@ -306,6 +307,12 @@ public class ServiceTest {
         return Set.of(nodes);
     }
 
+    /** {@code ignores()} 交出去的是副本：外面把它清空也动不了内部状态。 */
+    private static boolean protectedCopy() {
+        store.ignores().clear();
+        return !store.ignores().isEmpty();
+    }
+
     private static final Set<String> BASIC = perms(
             "vwhisper.msg", "vwhisper.reply", "vwhisper.toggle", "vwhisper.ignore");
 
@@ -376,6 +383,41 @@ public class ServiceTest {
         check("有 toggle.bypass 的管理能发进去", service.send(admin.source, "Bob", "开门"));
         check("   并且对方真的收到了", bob.saw("Admin→我: 开门"));
         store.setReceiving(bob.uuid, true, false);
+
+        // ---- 3.5 /msgtoggle 的参数方向 + 「关接收」会不会被下线抹掉 ----
+        // （这两个上线前修掉：「toggle on」实际是关闭、下线会把持久化设置清掉）
+        final ToggleCommand toggleCmd = new ToggleCommand(plugin);
+        store.setReceiving(bob.uuid, true, false);
+        bob.clear();
+        toggleCmd.execute(invocation(bob.source, "on"));
+        check("/vw toggle on 之后是「开着接收」", store.isReceiving(bob.uuid));
+        bob.clear();
+        toggleCmd.execute(invocation(bob.source, "off"));
+        check("/vw toggle off 之后是「关掉接收」", !store.isReceiving(bob.uuid));
+        bob.clear();
+        toggleCmd.execute(invocation(bob.source));
+        check("不带参数是「开关」：此刻会重新打开", store.isReceiving(bob.uuid));
+        final boolean beforeTypo = store.isReceiving(bob.uuid);
+        toggleCmd.execute(invocation(bob.source, "随便打个错字"));
+        toggleCmd.execute(invocation(bob.source, "随便打个错字"));
+        check("认不出来的参数按开关处理（不是一律当 off，连按两次回到原状态）",
+                store.isReceiving(bob.uuid) == beforeTypo);
+        // 关掉 → 模拟下线 → 磁盘上的设置必须还在
+        toggleCmd.execute(invocation(bob.source, "off"));
+        store.forget(bob.uuid);
+        check("下线清的是会话状态，不是「关接收」这个长期偏好", !store.isReceiving(bob.uuid));
+        store.load();
+        check("重读磁盘后「关接收」仍在（持久化没被 forget 抹掉）", !store.isReceiving(bob.uuid));
+        store.setReceiving(bob.uuid, true, true);
+        store.load();
+        check("重新打开后能正确写回磁盘", store.isReceiving(bob.uuid));
+        // 屏蔽名单：新增 → 存盘 → 重读回来还在（⚠️ 测完必须自己撤掉，别污染后面的用例）
+        store.toggleIgnore(bob.uuid, alice.uuid, true);
+        store.load();
+        check("屏蔽名单存盘后重读还在", store.isIgnoring(bob.uuid, alice.uuid));
+        check("ignores() 给的是副本，改它不影响内部状态", protectedCopy());
+        store.toggleIgnore(bob.uuid, alice.uuid, false);
+        check("   撤掉之后确实不屏蔽了", !store.isIgnoring(bob.uuid, alice.uuid));
 
         // ---- 4. 屏蔽 /ignore ----
         store.toggleIgnore(bob.uuid, alice.uuid, false);
