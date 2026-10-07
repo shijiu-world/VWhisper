@@ -77,6 +77,47 @@ spy = "&8[&7#sender# &8→ &7#target#&8]&r&7 #message#"
 console = "&8[&c控制台 &8→ &7我&8]&r #message#"
 
 # ------------------------------------------------------------
+# 悬停提示 / 点击动作：鼠标放在私聊上能看见什么、点一下会发生什么
+#
+#   整条消息（除了 #message# 那截）  → 悬停显示 prefix + hover，点一下把 suggest 填进聊天框
+#   正文（#message#，真正说的那句话）→ 悬停显示 copy-hover，点一下复制到剪贴板
+#
+# enabled = false 整个关掉（两档都不挂，跟没这个功能一样）
+#
+# ★ prefix：悬停提示前面再加一截。可用占位符：
+#     #sender#  /  #target#  /  #sender-server#  /  #target-server#  （跟 [format] 里那四个一样）
+#     #server#   发送者所在服（等于 #sender-server#，「这条消息从哪个服来」）
+#     {server}   同上      {player}  这条私聊的对方（点一下要 /msg 谁）
+#     {time}     发送时间
+#   ⚠️ 它是直接拼在 hover 前面的，不会自动加分隔符 —— 想空格/换行就自己写在末尾
+#      （末尾那个空格会原样保留，不会被吞）
+#
+# ★ suggest：点一下填进聊天框的命令（**不是直接发出去**，玩家可以接着改）。
+#   默认 " /msg{player} " —— 收件人点一下就填好 "/msg 发送者 "，直接打内容就能回。
+#   看回执的发送者那边，{player} 是收件人；窥屏的人看到的也是发送者。
+#
+# ★ copy / copy-hover：正文那截。copy = false 整个关掉（正文恢复成跟前后一样）；
+#   copy-hover 留空 = 只不显示提示，点击照样复制。
+# ------------------------------------------------------------
+[Tooltip]
+enabled = true
+prefix = "&8[&6#server#&8] "
+hover = "&e发送时间: &6{time}"
+# suggest 末尾留一个空格，玩家点完接着就能输入内容
+suggest = " /msg{player} "
+copy = true
+copy-hover = "&7复制该文本"
+
+# {time} 的时间格式（Java 写法）
+#   HH:mm:ss              16:38:25
+#   yyyy-MM-dd HH:mm:ss   2026-10-06 16:38:25
+#   a h:mm                下午 4:38
+time-format = "HH:mm:ss"
+
+# {time} 用的时区；留空 = 服务器系统时区。例子："Asia/Shanghai"
+time-zone = ""
+
+# ------------------------------------------------------------
 # 各种提示语。#target# / #seconds# / #amount# 会被自动替换，
 # 每条前面会自动拼上下面的 prefix
 # ------------------------------------------------------------

@@ -34,8 +34,12 @@ import java.util.concurrent.TimeUnit;
 @Plugin(
         id = "vwhisper",
         name = "VWhisper",
-        version = "1.0.0",
-        description = "跨服私聊：/vw msg /vw reply /vw spy /vw toggle /vw ignore",
+        // ⚠️ 版本号必须是编译期常量，没法直接写 ${project.version} —— 走 BuildConstants 间接引过来，
+        //    它由 templating-maven-plugin 从 pom 生成（发版只改 pom 一处）。
+        //    🔴 别改回字面量：注解处理器会按这个值重写 velocity-plugin.json，
+        //    写死的话 /velocity plugins 里永远是旧版本号（v1.0.2 的 jar 显示 1.0.0 就是这么来的）。
+        version = BuildConstants.VERSION,
+        description = "跨服私聊：/msg /reply /spy /msgtoggle /ignore。纯代理端，子服不用装任何东西。",
         authors = {"拾玖世界"}
 )
 public final class VWhisper {
@@ -195,6 +199,11 @@ public final class VWhisper {
         logger.info("[vwhisper] 提示音：" + (config.soundEnabled() ? config.soundName() : "关"));
         logger.info("[vwhisper] 冷却：" + (config.cooldownSeconds() <= 0
                 ? "不限" : config.cooldownSeconds() + " 秒"));
+        logger.info("[vwhisper] 悬停/点击：" + (config.tooltipEnabled()
+                ? "开 —— 整条「" + config.tooltipPrefix() + config.tooltipHover()
+                        + "」，正文" + (config.tooltipCopy()
+                        ? "「" + config.tooltipCopyHover() + "」+ 点击复制" : "不单独处理")
+                : "关"));
     }
 
     private long configMtime() {

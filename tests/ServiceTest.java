@@ -16,6 +16,8 @@ import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.server.ServerInfo;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -37,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * VWhisper 集成测试：把 Velocity 的 API 用动态代理桩掉，跑真实的 WhisperService / MsgCommand。
@@ -190,6 +193,9 @@ public class ServiceTest {
         everyone.add(fake.player);
         return fake;
     }
+
+    /** 时:分:秒 —— 用来确认悬停里的 {time} 真的被换掉了。 */
+    private static final Pattern HMS = Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
 
     // ==================================================================
     // 搭环境
@@ -620,6 +626,72 @@ public class ServiceTest {
         root.execute(invocation(alice.source, "msg", "Bob"));
         check("从 /vw msg 进来时用法提示写的是 /vw msg", alice.saw("/vw msg <玩家> <消息>"));
 
+        // ---- 13. 悬停提示 / 点击动作（[Tooltip]）----
+        reconfig(defaultOverrides());
+        store.setReceiving(bob.uuid, true, false);
+        alice.clear();
+        bob.clear();
+        check("发一条带悬停的私聊", service.send(alice.source, "Bob", "你好啊"));
+        final Component gotByBob = bob.last();
+        final String bobHover = hoverOf(gotByBob);
+        check("对方那份整条带悬停：" + bobHover,
+                bobHover != null && bobHover.contains("[survival]") && bobHover.contains("发送时间"));
+        check("  悬停里的 {time} 是 时:分:秒", bobHover != null && HMS.matcher(bobHover).find());
+        check("  #server# 换成了**发送者**所在服（不是收件人的）",
+                bobHover != null && bobHover.contains("[survival]") && !bobHover.contains("[industry]"));
+        check("  点一下填的是「 /msg 发送者 」", " /msgAlice ".equals(clickOf(gotByBob)));
+        check("发送者自己那份填的是「 /msg 收件人 」", " /msgBob ".equals(clickOf(alice.last())));
+        check("正文点一下复制的是消息原文", "你好啊".equals(findCopy(gotByBob)));
+        check("  正文的悬停是「复制该文本」", "复制该文本".equals(hoverOf(copyNode(gotByBob))));
+
+        // 正文带颜色时复制的仍是不带颜色码的原文
+        alice.clear();
+        bob.clear();
+        service.send(alice.source, "Bob", "&c红色的");
+        check("正文有颜色码时复制的是原文（不带 &c）", "红色的".equals(findCopy(bob.last())));
+
+        // 窥屏那份：{player} 是「谁发的」
+        final Fake watcher2 = add(new Fake("Watcher2", "lobby", perms("vwhisper.spy"), perms()));
+        store.setSpying(watcher2.uuid, true);
+        watcher2.clear();
+        service.send(alice.source, "Bob", "被围观");
+        check("窥屏那份点一下填的是「 /msg 发送者 」", " /msgAlice ".equals(clickOf(watcher2.last())));
+        check("  窥屏那份的正文字样也在", "被围观".equals(findCopy(watcher2.last())));
+        store.setSpying(watcher2.uuid, false);
+
+        // copy = false：正文不挂复制（恢复成跟前后一样，靠继承）
+        final Map<String, Object> noCopy = defaultOverrides();
+        noCopy.put("Tooltip.copy", Boolean.FALSE);
+        reconfig(noCopy);
+        alice.clear();
+        bob.clear();
+        service.send(alice.source, "Bob", "不能复制");
+        check("copy = false 后正文没有复制事件", findCopy(bob.last()) == null);
+        check("  但整条的悬停/点击照旧", hoverOf(bob.last()) != null && clickOf(bob.last()) != null);
+
+        // copy-hover 留空 = 只不显示提示，点击照样复制
+        final Map<String, Object> blankCopyHover = defaultOverrides();
+        blankCopyHover.put("Tooltip.copy-hover", "");
+        reconfig(blankCopyHover);
+        bob.clear();
+        service.send(alice.source, "Bob", "空提示");
+        check("copy-hover 留空时正文仍可复制", "空提示".equals(findCopy(bob.last())));
+        check("  只是提示是空的", copyNode(bob.last()) != null && copyNode(bob.last()).hoverEvent() != null
+                && "".equals(hoverOf(copyNode(bob.last()))));
+
+        // enabled = false：两档都不挂
+        final Map<String, Object> off = defaultOverrides();
+        off.put("Tooltip.enabled", Boolean.FALSE);
+        reconfig(off);
+        alice.clear();
+        bob.clear();
+        service.send(alice.source, "Bob", "关掉了");
+        check("enabled = false 后整条没有悬停", hoverOf(bob.last()) == null);
+        check("  整条没有点击", clickOf(bob.last()) == null);
+        check("  正文也没有复制", findCopy(bob.last()) == null);
+        check("  消息本身照旧发到了", bob.saw("Alice→我: 关掉了"));
+        reconfig(defaultOverrides());
+
         System.out.println();
         if (failures.isEmpty()) {
             System.out.println("全部 " + passed + " 条断言通过 ✅");
@@ -675,6 +747,58 @@ public class ServiceTest {
             }
         }
         return TextDecoration.State.NOT_SET;
+    }
+
+    /** 悬停文本（转成纯文本方便比对）；没有悬停就 null。 */
+    private static String hoverOf(final Component c) {
+        if (c == null) {
+            return null;
+        }
+        final HoverEvent<?> event = c.hoverEvent();
+        if (event == null) {
+            return null;
+        }
+        final Object value = event.value();
+        return value instanceof Component ? PlainText.of((Component) value) : String.valueOf(value);
+    }
+
+    /**
+     * 点击动作的值（建议命令 / 复制内容）；没有就 null。
+     *
+     * <p>⚠️ 不是 {@code ClickEvent#value()}：新版 adventure 把值收进了 {@code payload()}
+     * （{@code Payload.Text#value()}），直接调 value() 编译不过。
+     */
+    private static String clickOf(final Component c) {
+        final ClickEvent<?> event = c == null ? null : c.clickEvent();
+        if (event == null) {
+            return null;
+        }
+        final Object payload = event.payload();
+        return payload instanceof ClickEvent.Payload.Text
+                ? ((ClickEvent.Payload.Text) payload).value() : String.valueOf(payload);
+    }
+
+    /** 在这棵组件树里找第一个「点击复制到剪贴板」的节点；没有就 null。 */
+    private static Component copyNode(final Component node) {
+        if (node == null) {
+            return null;
+        }
+        final ClickEvent event = node.clickEvent();
+        if (event != null && event.action() == ClickEvent.Action.COPY_TO_CLIPBOARD) {
+            return node;
+        }
+        for (final Component child : node.children()) {
+            final Component found = copyNode(child);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    /** 同上，直接给出复制的文本。 */
+    private static String findCopy(final Component node) {
+        return clickOf(copyNode(node));
     }
 
     private static boolean hasColor(final Fake fake) {

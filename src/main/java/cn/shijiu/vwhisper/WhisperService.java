@@ -219,9 +219,11 @@ public final class WhisperService {
         placeholders.put("#sender-server#", sender == null ? ConsoleLabel.SERVER : serverName(sender));
         placeholders.put("#target-server#", serverName(target));
 
-        final Component toSender = render(config, config.formatSender(), placeholders, message);
+        // 「对方」= 看这份的人会想回给谁：发送者那份是收件人，收件人那份是发送者
+        final Component toSender = render(config, config.formatSender(), placeholders, message,
+                target.getUsername());
         final Component toTarget = render(config, sender == null ? config.formatConsole() : config.formatReceiver(),
-                placeholders, message);
+                placeholders, message, senderName);
 
         // 自言自语：只发一条（用 sender 那套「我 → 我」），不然同一句话会收两遍
         final boolean self = sender != null && sender.getUniqueId().equals(target.getUniqueId());
@@ -246,7 +248,7 @@ public final class WhisperService {
 
         // 窥屏：转给所有开着 spy 的人。自己跟自己说话不广播
         if (!self) {
-            spyCast(sender, target, config, placeholders, message);
+            spyCast(sender, target, config, placeholders, message, senderName);
         }
 
         if (config.logToConsole()) {
@@ -277,7 +279,8 @@ public final class WhisperService {
     }
 
     private void spyCast(final Player sender, final Player target, final Configuration config,
-                         final Map<String, String> placeholders, final Component message) {
+                         final Map<String, String> placeholders, final Component message,
+                         final String senderName) {
         if (Permissions.has(sender, Permissions.SPY_BYPASS, false)
                 || Permissions.has(target, Permissions.SPY_BYPASS, false)) {
             return;
@@ -295,7 +298,8 @@ public final class WhisperService {
                 continue;
             }
             if (spy == null) {
-                spy = render(config, config.formatSpy(), placeholders, message);
+                // 窥屏的人想回的是「谁发的」—— 所以这里的「对方」填发送者
+                spy = render(config, config.formatSpy(), placeholders, message, senderName);
             }
             watcher.sendMessage(spy);
         }
@@ -308,10 +312,13 @@ public final class WhisperService {
     /**
      * 渲染一份模板。
      *
-     * @param message 已经处理好的消息组件 —— 它不参与颜色解析，避免玩家自己写的东西被当成语法
+     * @param message   已经处理好的消息组件 —— 它不参与颜色解析，避免玩家自己写的东西被当成语法
+     * @param otherName 「这条私聊的对方」：填悬停/点击里的 {@code {player}}。
+     *                  看这份的人点一下要把 {@code /msg 对方} 填进聊天框 —— 所以每份都不一样
      */
     private Component render(final Configuration config, final String template,
-                             final Map<String, String> placeholders, final Component message) {
+                             final Map<String, String> placeholders, final Component message,
+                             final String otherName) {
         String resolved = template;
         for (final Map.Entry<String, String> entry : placeholders.entrySet()) {
             resolved = resolved.replace(entry.getKey(), entry.getValue());
@@ -322,15 +329,20 @@ public final class WhisperService {
         }
         final String[] parts = resolved.split("#message#", -1);
         final TextComponent.Builder builder = Component.text();
+        // 复制到剪贴板用的是纯文本 —— 必须在插进模板【之前】从原始消息组件上取，
+        // 那时它还没被 carry() 包一层，也没有任何模板里的东西混进来
+        final String copyText = PlainText.of(message);
         for (int i = 0; i < parts.length; i++) {
             if (i > 0) {
                 // 模板里写在 #message# 前面的那个颜色码（&7 #message#）只染到了它自己那几个字符，
                 // 消息是另一个兄弟节点，继承不到。所以把那个样式「带」给消息 —— 见 carry()。
-                builder.append(carry(message, styleAt(config, parts[i - 1])));
+                builder.append(ChatTooltip.copy(carry(message, styleAt(config, parts[i - 1])),
+                        config, copyText));
             }
             builder.append(parse(config, parts[i]));
         }
-        return builder.build();
+        // 整条消息那一档最后挂：它挂在根上，正文自己设过事件就不会继承它
+        return ChatTooltip.apply(builder.build(), config, placeholders, otherName);
     }
 
     /**

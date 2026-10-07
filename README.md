@@ -19,7 +19,7 @@
 
 ## 安装
 
-1. `vwhisper-1.0.2.jar` 丢进代理的 `plugins/` 目录
+1. `vwhisper-1.1.0.jar` 丢进代理的 `plugins/` 目录
 2. 启动代理一次，会自动生成 `plugins/vwhisper/config.toml`
 3. 改完配置用 `/vw reload`（控制台直接敲也行）
 
@@ -144,6 +144,57 @@ sender = "&8[&7我 &8→ &7#target#&8]&r #message#"     # 消息不带颜色 →
 > 变量在代理端拿不到，硬要就要额外装 PAPIProxyBridge 并多一次跨服往返 —— 不值。
 > 想让称号出现在聊天里是子服那边 `Chat.GeneralFormat` 的事，这里不掺和。
 
+## 悬停提示 / 点击动作（`[Tooltip]`）
+
+鼠标放在私聊上能看见什么、点一下会发生什么。跟 Vmessage 那套是同一个路子，分两档：
+
+| 位置 | 悬停 | 点击 |
+| --- | --- | --- |
+| 整条消息（`#message#` 以外的部分） | `prefix + hover`（默认先亮一个服务器名 + 发送时间） | 把 `suggest` **填进聊天框**（不是直接发出去） |
+| 正文 `#message#`（真正说的那句话） | `copy-hover`（默认「复制该文本」） | **复制到剪贴板** |
+
+```toml
+[Tooltip]
+enabled = true
+prefix = "&8[&6#server#&8] "
+hover = "&e发送时间: &6{time}"
+# suggest 末尾留一个空格，玩家点完接着就能输入内容
+suggest = " /msg{player} "
+copy = true
+copy-hover = "&7复制该文本"
+time-format = "HH:mm:ss"
+time-zone = ""
+```
+
+| 配置 | 默认 | 说明 |
+| --- | --- | --- |
+| `enabled` | `true` | 总开关；`false` 时两档都不挂，消息照常发 |
+| `prefix` | `"&8[&6#server#&8] "` | 悬停文本前面再加一截；**直接拼在 `hover` 前面**，不会自动加分隔符 |
+| `hover` | `"&e发送时间: &6{time}"` | 整条消息的悬停文本；留空 = 不显示提示 |
+| `suggest` | `" /msg{player} "` | 点一下填进聊天框的命令；留空 = 点了没反应 |
+| `copy` | `true` | 正文能不能复制；`false` = 正文恢复成跟前后一样 |
+| `copy-hover` | `"&7复制该文本"` | 正文的悬停文本；留空 = 只不显示提示，点击照样复制 |
+| `time-format` | `"HH:mm:ss"` | `{time}` 的格式（Java 写法） |
+| `time-zone` | `""` | `{time}` 的时区；留空 = 服务器系统时区 |
+
+可用的占位符：
+
+| 占位符 | 含义 |
+| --- | --- |
+| `{time}` | 发送时间，按 `time-format` / `time-zone` 渲染 |
+| `{player}` | **这条私聊的对方** —— 收件人点一下填的是 `/msg 发送者`，发送者自己那份填的是 `/msg 收件人`，窥屏的人看到的也是发送者 |
+| `{server}` `#server#` | 发送者所在服（等于 `#sender-server#`，即「这条消息从哪个服来」） |
+| `#sender#` `#target#` `#sender-server#` `#target-server#` | 跟 `[format]` 里那四个一样 |
+
+几点说明：
+
+- **正文那档是独立挂的**，不会继承整条的「发送时间 / 填 /msg」—— 鼠标移到正文上就是「复制该文本」，
+  移到前后那些字上才是发送时间。
+- 复制的是**消息原文**：玩家写的 `&c` 之类不会跟着进剪贴板（`&c红色的` 复制出来是 `红色的`）。
+- 提示串跟 `[format].minimessage` 同一个待遇：开着 MiniMessage 就用 `<red>` 语法，关着就用 `&` 颜色码。
+- `prefix` 末尾的空格会**原样保留**（不会像主格式那样被收尾清理吞掉）—— 想换行或空格就自己写在末尾。
+- 关掉总开关只是不挂事件，消息本身照发。
+
 ## 给自己发私聊（自言自语）
 
 默认**允许** —— `/msg 自己的名字 记点什么` 就能给自己发，当随身便签用（记坐标、记待办）。
@@ -194,7 +245,7 @@ cd D:\Code\mc\plugins\VWhisper
 JAVA_HOME=D:/Code/Java/zulu25.34.17-ca-jdk25.0.3-win_x64 mvn -B -o clean package
 ```
 
-产物：`target/vwhisper-1.0.2.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
+产物：`target/vwhisper-1.1.0.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
 
 > 构建为什么必须零依赖：本机 Maven 是离线的，装不上 maven-shade 插件，打不进第三方库，
 > 所以连 TOML 解析都是自己写的（`TomlLite`，~300 行，格式写错也只是取到默认值，不会把插件搞挂）。
@@ -219,8 +270,8 @@ $out = "D:\tmp\vwtest"
 
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
-| `SmokeTest` | 49 | TOML 解析、颜色/渐变渲染（**要传 `target/classes/config.toml` 作 `args[0]`**） |
-| `ServiceTest` | 51 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全 |
+| `SmokeTest` | 56 | TOML 解析、颜色/渐变渲染（**要传 `target/classes/config.toml` 作 `args[0]`**） |
+| `ServiceTest` | 86 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**悬停/点击（`[Tooltip]` 两档）** |
 | `ClasspathTest` | 3 | 运行环境校验，见下 |
 
 > `ClasspathTest` 是 `/msg` 一次实机崩溃之后补的。它用一个**只看得见 velocity jar + 本项目 classes**

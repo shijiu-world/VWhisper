@@ -6,7 +6,7 @@
 
     <groupId>cn.shijiu</groupId>
     <artifactId>vwhisper</artifactId>
-    <version>1.0.2</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <name>VWhisper</name>
@@ -34,6 +34,23 @@
                     <release>${java.version}</release>
                     <encoding>UTF-8</encoding>
                 </configuration>
+            </plugin>
+            <!-- 把 src/main/java-templates 里的 ${project.version} 换成真版本号，
+                 生成 BuildConstants —— @Plugin(version = ...) 只能吃编译期常量，
+                 而注解的值会盖掉 velocity-plugin.json 里那份（见 BuildConstants 的注释）。
+                 ⚠️ 没有它，产物里显示的版本号永远是注解里硬编码的那串。 -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>templating-maven-plugin</artifactId>
+                <version>1.0.0</version>
+                <executions>
+                    <execution>
+                        <id>filter-src</id>
+                        <goals>
+                            <goal>filter-sources</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -57,6 +59,15 @@ public final class Configuration {
     private final String formatReceiver;
     private final String formatSpy;
     private final String formatConsole;
+    // ---------------- 悬停提示 / 点击动作 ----------------
+    private final boolean tooltipEnabled;
+    private final String tooltipPrefix;
+    private final String tooltipHover;
+    private final String tooltipSuggest;
+    private final boolean tooltipCopy;
+    private final String tooltipCopyHover;
+    private final DateTimeFormatter tooltipTimeFormat;
+    private final ZoneId tooltipZone;
     // ---------------- 提示语 ----------------
     private final String prefix;
     private final Map<String, String> messages;
@@ -98,6 +109,16 @@ public final class Configuration {
         this.formatReceiver = TomlLite.string(m, "format.receiver", "&8[&7#sender# &8→ &7我&8]&r #message#");
         this.formatSpy = TomlLite.string(m, "format.spy", "&8[&cSpy&8] &7#sender# &8→ &7#target#&8:&r #message#");
         this.formatConsole = TomlLite.string(m, "format.console", "&8[&c控制台 &8→ &7我&8]&r #message#");
+
+        this.tooltipEnabled = TomlLite.bool(m, "Tooltip.enabled", true);
+        this.tooltipPrefix = TomlLite.string(m, "Tooltip.prefix", ChatTooltip.DEFAULT_PREFIX);
+        this.tooltipHover = TomlLite.string(m, "Tooltip.hover", ChatTooltip.DEFAULT_HOVER);
+        this.tooltipSuggest = TomlLite.string(m, "Tooltip.suggest", ChatTooltip.DEFAULT_SUGGEST);
+        this.tooltipCopy = TomlLite.bool(m, "Tooltip.copy", true);
+        this.tooltipCopyHover = TomlLite.string(m, "Tooltip.copy-hover", ChatTooltip.DEFAULT_COPY_HOVER);
+        this.tooltipTimeFormat = ChatTooltip.compileTimeFormat(
+                TomlLite.string(m, "Tooltip.time-format", ChatTooltip.DEFAULT_TIME_PATTERN));
+        this.tooltipZone = ChatTooltip.parseZone(TomlLite.string(m, "Tooltip.time-zone", ""));
 
         this.allowSelfMessage = TomlLite.bool(m, "general.allow-self-message", true);
 
@@ -241,6 +262,55 @@ public final class Configuration {
 
     public String formatConsole() {
         return formatConsole;
+    }
+
+    // ------------------------------------------------------------------
+    // 悬停提示 / 点击动作（[Tooltip]）
+    // ------------------------------------------------------------------
+
+    /** 悬停提示 / 点击动作的总开关；关掉时两档都不挂。 */
+    public boolean tooltipEnabled() {
+        return tooltipEnabled;
+    }
+
+    /**
+     * 悬停提示前面那截固定内容（默认先亮一个发送者所在服）。
+     *
+     * <p>存的是<b>模板</b>（里面可以有 {@code #server#} / {@code {player}} / {@code {time}}），
+     * 换成真值是在 {@link ChatTooltip#apply} 里跟 hover 一起做的。
+     */
+    public String tooltipPrefix() {
+        return tooltipPrefix;
+    }
+
+    /** 整条消息上的悬停文本（默认「发送时间: xx:xx:xx」）。 */
+    public String tooltipHover() {
+        return tooltipHover;
+    }
+
+    /** 点一下填进聊天框的命令（默认 {@code " /msg{player} "}）。 */
+    public String tooltipSuggest() {
+        return tooltipSuggest;
+    }
+
+    /** 正文（{@code #message#}）点一下要不要能复制。 */
+    public boolean tooltipCopy() {
+        return tooltipCopy;
+    }
+
+    /** 鼠标放在正文上的提示（默认「复制该文本」）；留空 = 只不显示提示，点击照样复制。 */
+    public String tooltipCopyHover() {
+        return tooltipCopyHover;
+    }
+
+    /** {@code {time}} 的时间格式；写错时按 HH:mm:ss 兜底。 */
+    public DateTimeFormatter tooltipTimeFormat() {
+        return tooltipTimeFormat;
+    }
+
+    /** {@code {time}} 用的时区；留空 = 服务器系统时区。 */
+    public ZoneId tooltipZone() {
+        return tooltipZone;
     }
 
     /**

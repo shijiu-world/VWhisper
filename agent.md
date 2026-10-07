@@ -10,7 +10,7 @@
 
 - 源码：`D:\Code\mc\plugins\VWhisper`
 - 仓库：`git@github.com:shijiu-world/VWhisper.git`（**走 SSH**，https 会被本机代理掐断 502）
-- 产物：`target/vwhisper-1.0.2.jar`（class 61，Velocity 3.4+ ~ 4.x 通用）
+- 产物：`target/vwhisper-1.1.0.jar`（class 61，Velocity 3.4+ ~ 4.x 通用）
 - 主命令 `/vwhisper`，默认别名 `/vw`；顶层快捷命令接管 `/msg` `/w` `/m` `/tell` `/whisper` `/reply` `/r`
 
 ---
@@ -29,6 +29,7 @@
 | `Store.java` | 223 | 内存态 + 落盘：屏蔽名单、接收开关、spy、reply 记忆 | 文件 `plugins/vwhisper/ignores.txt`、`toggles.txt` |
 | `Permissions.java` | 89 | 权限闸门。`allow-by-default` 只影响 4 个基础节点 | 特权节点（spy/reload/bypass/color）一律要显式给 |
 | `ChatColors.java` | 237 | 自研颜色解析器：`&c` / `&#RRGGBB` / `&x&F&F...` / `{#F00}` / 渐变 | 与 Vmessage 那份**同源但独立**，改语法两边都要改 |
+| `ChatTooltip.java` | 265 | 悬停提示 + 点击动作（`[Tooltip]`）。两档：整条消息 = hover+suggest，正文 = 复制 | 思路对齐 Vmessage 的 `ChatTooltip`，但占位符是 VWhisper 那套 `#xxx#` |
 | `PlainText.java` | 47 | 组件转纯文本（控制台日志用） | 🔴 **不用** `PlainComponentSerializer`，见下 |
 | `TomlLite.java` | 272 | 自研 TOML 解析（~300 行） | 为什么自研：离线 Maven 装不上任何库 |
 | `command/RootCommand.java` | 213 | 唯一命令入口，子命令分发 + Tab 补全 + help | 内部 `Entry` 表把别名映射到子命令；`Invocation` 包装器带实际敲的 alias |
@@ -56,6 +57,7 @@
   ↓ deliver()：
   ↓   ① 按 [colors].mode + vwhisper.msg.color 权限渲染消息内容
   ↓   ② 拼 [format].sender / .receiver / .console
+  ↓        ↳ 拼的过程中：正文先挂「复制」(ChatTooltip.copy)，最后整条挂 hover+suggest (apply)
   ↓   ③ 给接收者发 + 播提示音；给发送者发回执
   ↓   ④ 所有开 spy 的人发一份 [format].spy（除 spy.bypass 的人）
   ↓   ⑤ rememberContact(双方) → /reply 可以用了
@@ -85,6 +87,16 @@
    `WhisperService`：只发一条（用 sender 格式）、不查 toggle/ignore、不写 reply 记忆、不广播 spy。
    改动前先想清楚这四条——尤其「不写 reply 记忆」，否则自言自语之后 `/r` 会指向自己，
    把「回复上一个人」这条路堵死。
+10. 📌 **`[Tooltip]` 里 `{player}` = 「这条私聊的对方」，不是固定指发送者**。`render()` 每渲染
+    一份就要传一个 `otherName`：发送者自己的回执 → 收件人；收件人那份 → 发送者；窥屏那份 → 发送者。
+    因为每份的点一下含义不同（要 `/msg` 回去的那个人不一样）。`{server}` / `#server#` 则是固定的
+    「发送者所在服」（= `#sender-server#`，「这条消息从哪来」）。
+11. 📌 **版本号只改 `pom.xml` 一处**。`@Plugin(version = BuildConstants.VERSION)`，
+    `BuildConstants` 由 `src/main/java-templates/` 经 `templating-maven-plugin` 生成。
+    🔴 **别把字面量写回注解里**：velocity-api 的注解处理器会在 compile 阶段按注解重写
+    `velocity-plugin.json`，写死的话产物里永远是旧版本号（v1.0.2 的 jar 显示 1.0.0 就是这么来的）。
+12. 📌 **`ClickEvent` 没有 `value()`**（新版 adventure 把值收进了 `payload()`，
+    `ClickEvent.Payload.Text#value()`）。写测试/新代码时别照着老例子抄。
 
 ---
 
@@ -166,7 +178,7 @@ $out = "D:\tmp\vwtest"
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
 | `SmokeTest` | 56 | TOML 解析（含**无引号值的行尾注释、多行数组、段名行带注释的 `]`**）、颜色/渐变渲染。**必须传 `target/classes/config.toml` 作 `args[0]`** |
-| `ServiceTest` | 67 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`/`ToggleCommand`：权限闸门、接收开关（**含 `/vw toggle on` 方向**）、屏蔽与**存盘往返**、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**#message# 的样式继承** |
+| `ServiceTest` | 86 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`/`ToggleCommand`：权限闸门、接收开关（**含 `/vw toggle on` 方向**）、屏蔽与**存盘往返**、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**#message# 的样式继承**、**悬停/点击（`[Tooltip]` 两档 19 条）** |
 | `ClasspathTest` | 3 | 隔离 ClassLoader 只加载 velocity jar + 本项目 classes，验证工具类可加载，**并反向验证旧写法在同一环境确实挂**（否则这测试是自欺欺人） |
 
 > ⚠️ 写新用例时**测完要把状态还原**（例如 `toggleIgnore` 加了就要撤掉）：
@@ -184,7 +196,7 @@ $out = "D:\tmp\vwtest"
 | LuckPerms | **不是硬依赖**。权限走 Velocity 原生 `CommandSource#getPermissionValue`，谁提供权限都行 |
 | PAPIProxyBridge | **不依赖、不用装** |
 
-⚠️ 上线状态：`vwhisper-1.0.2.jar` 已在本地测试服 `D:\game\test_velocity\velocity\plugins\` 就位，
+⚠️ 上线状态：`vwhisper-1.1.0.jar` 已在本地测试服 `D:\game\test_velocity\velocity\plugins\` 就位，
 **线上尚未部署**。
 
 ---
