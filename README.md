@@ -19,7 +19,7 @@
 
 ## 安装
 
-1. `vwhisper-1.1.0.jar` 丢进代理的 `plugins/` 目录
+1. `vwhisper-1.2.0.jar` 丢进代理的 `plugins/` 目录
 2. 启动代理一次，会自动生成 `plugins/vwhisper/config.toml`
 3. 改完配置用 `/vw reload`（控制台直接敲也行）
 
@@ -195,6 +195,47 @@ time-zone = ""
 - `prefix` 末尾的空格会**原样保留**（不会像主格式那样被收尾清理吞掉）—— 想换行或空格就自己写在末尾。
 - 关掉总开关只是不挂事件，消息本身照发。
 
+## 提示音（`[sound]`）
+
+收到私聊的人会听到一声提示音。分**三档**，各档独立开关、独立音效：
+
+```toml
+[sound]
+enabled = true          # 总闸；关掉时三档都不响
+
+[sound.target]          # 收到私聊的人（默认开 —— 就是「有人私聊你」的提醒）
+enabled = true
+name = "minecraft:entity.experience_orb.pickup"
+volume = 1.0
+pitch = 1.0
+source = "player"
+
+[sound.sender]          # 发出私聊的人（默认关，发件回执音，开着会有点吵）
+enabled = false
+name = "minecraft:entity.experience_orb.pickup"
+[sound.spy]             # 开着 /spy 窥屏的人（默认关）
+enabled = false
+name = "minecraft:entity.experience_orb.pickup"
+```
+
+| 配置 | 默认 | 说明 |
+|---|---|---|
+| `enabled`（总闸和每档都有） | 见上 | 总闸**和**这一档自己的 `enabled` 都为 `true` 才响 |
+| `name` | 经验球拾取音 | 音效 id |
+| `volume` / `pitch` | `1.0` / `1.0` | 音量 / 音调 |
+| `source` | `"player"` | 走游戏设置里哪个音量滑块，见下 |
+
+几点说明：
+
+- 🔴 **自言自语一律不响** —— 「提醒」这个语义只在**别人**发给你的时候成立。
+- 📌 `source` 决定这条音效归游戏设置里哪个分类管：`master` / `music` / `record` / `weather` /
+  `block` / `hostile` / `neutral` / `player` / `ambient` / `voice` / `ui`，写歪退回 `player`。
+  想让私聊提示**不受玩家调音量影响**，把它设成 `master`。
+- ⚠️ **音效 id 必须全小写**（`minecraft:xxx`）。带大写或空格会让这一档失效并退回默认音 ——
+  不会让消息发不出去，但你会纳闷为什么没声。资源包里的自定义音效写 `命名空间:音效名`，例如 `mypack:ding`。
+- 🔴 **老配置不用改**：升级前只有一组 `[sound]`（`enabled`/`name`/`volume`/`pitch`），
+  它会被自动当成**接收者**那一档沿用（音量音调一起）。`sender` / `spy` 两档默认关着，不打扰。
+
 ## 给自己发私聊（自言自语）
 
 默认**允许** —— `/msg 自己的名字 记点什么` 就能给自己发，当随身便签用（记坐标、记待办）。
@@ -245,7 +286,7 @@ cd D:\Code\mc\plugins\VWhisper
 JAVA_HOME=D:/Code/Java/zulu25.34.17-ca-jdk25.0.3-win_x64 mvn -B -o clean package
 ```
 
-产物：`target/vwhisper-1.1.0.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
+产物：`target/vwhisper-1.2.0.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
 
 > 构建为什么必须零依赖：本机 Maven 是离线的，装不上 maven-shade 插件，打不进第三方库，
 > 所以连 TOML 解析都是自己写的（`TomlLite`，~300 行，格式写错也只是取到默认值，不会把插件搞挂）。
@@ -273,7 +314,7 @@ $out = "D:\tmp\vwtest"
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
 | `SmokeTest` | 56 | TOML 解析、颜色/渐变渲染（**要传 `target/classes/config.toml` 作 `args[0]`**） |
-| `ServiceTest` | 86 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**悬停/点击（`[Tooltip]` 两档）** |
+| `ServiceTest` | 103 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**悬停/点击（`[Tooltip]` 两档）**、**提示音三档（含老配置升级兜底）** |
 | `ClasspathTest` | 3 | 运行环境校验，见下 |
 
 > `TooltipProbe` **不是测试**，是排障工具：给它一个配置目录（或 `config.toml` 路径），

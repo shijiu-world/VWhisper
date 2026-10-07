@@ -14,6 +14,7 @@ import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.server.ServerInfo;
+import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -61,6 +62,8 @@ public class ServiceTest {
         final Set<String> allowed;
         final Set<String> denied;
         final List<Component> inbox = new ArrayList<>();
+        /** 听到过的提示音。 */
+        final List<Sound> sounds = new ArrayList<>();
         final CommandSource source;
         final Player player;
 
@@ -79,6 +82,13 @@ public class ServiceTest {
                     case "sendMessage":
                         if (args != null && args[0] instanceof Component) {
                             inbox.add((Component) args[0]);
+                        }
+                        return null;
+                    case "playSound":
+                        // ⚠️ Audience 里 playSound 有好几个重载（带坐标的、带 emitter 的），
+                        //    只认第一个参数是 Sound 的那个
+                        if (args != null && args[0] instanceof Sound) {
+                            sounds.add((Sound) args[0]);
                         }
                         return null;
                     case "toString": return "Fake(" + name + ")";
@@ -133,6 +143,22 @@ public class ServiceTest {
 
         void clear() {
             inbox.clear();
+            sounds.clear();
+        }
+
+        /** 听到过几个提示音。 */
+        int soundCount() {
+            return sounds.size();
+        }
+
+        /** 最后一个提示音的 id；没听到过就 null。 */
+        String lastSound() {
+            return sounds.isEmpty() ? null : sounds.get(sounds.size() - 1).name().asString();
+        }
+
+        /** 最后一个提示音走的音量滑块；没听到过就 null。 */
+        String lastSoundSource() {
+            return sounds.isEmpty() ? null : sounds.get(sounds.size() - 1).source().name();
         }
     }
 
@@ -278,6 +304,27 @@ public class ServiceTest {
         overrides.put("format.sender", "&7我→#target#: #message#");
         overrides.put("format.receiver", "&7#sender#→我: #message#");
         overrides.put("format.spy", "&7[spy] #sender#→#target#: #message#");
+        return overrides;
+    }
+
+    /**
+     * 模拟 **v1.2.0 之前**的老配置：只有一组 {@code [sound]}，没有 {@code sound.target.*}。
+     *
+     * <p>⚠️ 测试基线总是以随包的 {@code config.toml} 打底（里面已经有新键了），
+     * 所以这里必须用 {@code null} 把新键「抹掉」—— {@code TomlLite} 把 null 当缺失处理，
+     * 正好等价于「配置文件里没写这一行」。
+     */
+    private static Map<String, Object> legacySoundOverrides() {
+        final Map<String, Object> overrides = defaultOverrides();
+        overrides.put("sound.target.enabled", null);
+        overrides.put("sound.target.name", null);
+        overrides.put("sound.target.volume", null);
+        overrides.put("sound.target.pitch", null);
+        overrides.put("sound.target.source", null);
+        overrides.put("sound.enabled", Boolean.TRUE);
+        overrides.put("sound.name", "minecraft:entity.player.levelup");
+        overrides.put("sound.volume", 0.5D);
+        overrides.put("sound.pitch", 2.0D);
         return overrides;
     }
 
@@ -690,6 +737,107 @@ public class ServiceTest {
         check("  整条没有点击", clickOf(bob.last()) == null);
         check("  正文也没有复制", findCopy(bob.last()) == null);
         check("  消息本身照旧发到了", bob.saw("Alice→我: 关掉了"));
+        reconfig(defaultOverrides());
+
+        // ---- 14. 提示音三档（[sound] / [sound.target] / [sound.sender] / [sound.spy]）----
+        // ⚠️ defaultOverrides() 里 sound.enabled 是 false（免得别的用例被提示音干扰），
+        //    这一段的每个 overrides 都要自己把总闸打开
+        final Map<String, Object> soundOn = defaultOverrides();
+        soundOn.put("sound.enabled", Boolean.TRUE);
+        reconfig(soundOn);
+        store.setReceiving(bob.uuid, true, false);
+        alice.clear();
+        bob.clear();
+        service.send(alice.source, "Bob", "叮");
+        check("默认：只有收到私聊的人听到提示音", bob.soundCount() == 1 && alice.soundCount() == 0);
+        check("  听到的是默认音效", "minecraft:entity.experience_orb.pickup".equals(bob.lastSound()));
+        check("  默认走 player 滑块", "PLAYER".equals(bob.lastSoundSource()));
+
+        // 自言自语不该响 —— 「提醒」只在别人发给你时才成立
+        alice.clear();
+        service.send(alice.source, "Alice", "自言自语");
+        check("自言自语不响提示音", alice.soundCount() == 0);
+
+        // 三档全开
+        final Map<String, Object> allOn = defaultOverrides();
+        allOn.put("sound.enabled", Boolean.TRUE);
+        allOn.put("sound.sender.enabled", Boolean.TRUE);
+        allOn.put("sound.sender.name", "minecraft:block.note_block.bell");
+        allOn.put("sound.spy.enabled", Boolean.TRUE);
+        allOn.put("sound.spy.name", "minecraft:block.note_block.pling");
+        reconfig(allOn);
+        final Fake listener = add(new Fake("Listener", "lobby", perms("vwhisper.spy"), perms()));
+        store.setSpying(listener.uuid, true);
+        alice.clear();
+        bob.clear();
+        listener.clear();
+        service.send(alice.source, "Bob", "三档全开");
+        check("三档全开：接收者听到", bob.soundCount() == 1);
+        check("  发送者听到的是 sender 那一档",
+                alice.soundCount() == 1 && "minecraft:block.note_block.bell".equals(alice.lastSound()));
+        check("  窥屏的人听到的是 spy 那一档",
+                listener.soundCount() == 1 && "minecraft:block.note_block.pling".equals(listener.lastSound()));
+        check("  三档各响各的，没有串（接收者=" + bob.lastSound()
+                        + " 发送者=" + alice.lastSound() + " 窥屏=" + listener.lastSound() + "）",
+                bob.lastSound() != null && alice.lastSound() != null && listener.lastSound() != null
+                        && !bob.lastSound().equals(alice.lastSound())
+                        && !alice.lastSound().equals(listener.lastSound()));
+        store.setSpying(listener.uuid, false);
+
+        // 总闸关掉：三档都不响
+        final Map<String, Object> masterOff = defaultOverrides();
+        masterOff.put("sound.enabled", Boolean.FALSE);
+        masterOff.put("sound.sender.enabled", Boolean.TRUE);
+        masterOff.put("sound.spy.enabled", Boolean.TRUE);
+        reconfig(masterOff);
+        alice.clear();
+        bob.clear();
+        service.send(alice.source, "Bob", "总闸关了");
+        check("总闸关掉时三档都不响", bob.soundCount() == 0 && alice.soundCount() == 0);
+
+        // 🔴 升级兜底：老配置只有一组 [sound]（enabled/name/volume/pitch），它就是接收者那档
+        reconfig(legacySoundOverrides());
+        final Configuration old = plugin.configuration();
+        check("老配置的 sound.name 被沿用成 target 那一档",
+                "minecraft:entity.player.levelup".equals(old.soundTarget().name()));
+        check("  音量音调也一起沿用",
+                Math.abs(old.soundTarget().volume() - 0.5F) < 0.001F
+                        && Math.abs(old.soundTarget().pitch() - 2.0F) < 0.001F);
+        check("  老配置没写 sender / spy，默认关着", !old.soundSender().enabled() && !old.soundSpy().enabled());
+        alice.clear();
+        bob.clear();
+        service.send(alice.source, "Bob", "老配置");
+        check("  老配置下发消息，接收者听到的还是自己那个音效",
+                bob.soundCount() == 1 && "minecraft:entity.player.levelup".equals(bob.lastSound()));
+
+        // 音效 id 写歪（大写 / 空格）→ 退回默认，不能让整条消息挂掉
+        final Map<String, Object> badName = defaultOverrides();
+        badName.put("sound.enabled", Boolean.TRUE);
+        badName.put("sound.target.name", "minecraft:Entity.Experience_Orb.Pickup");
+        reconfig(badName);
+        alice.clear();
+        bob.clear();
+        check("音效 id 带大写时消息照旧发出去", service.send(alice.source, "Bob", "名字写歪"));
+        check("  音效退回默认那个，没有炸", bob.soundCount() == 1
+                && "minecraft:entity.experience_orb.pickup".equals(bob.lastSound()));
+
+        // source 写歪 → 退回 player
+        final Map<String, Object> badSource = defaultOverrides();
+        badSource.put("sound.enabled", Boolean.TRUE);
+        badSource.put("sound.target.source", "not-a-source");
+        reconfig(badSource);
+        bob.clear();
+        service.send(alice.source, "Bob", "滑块写歪");
+        check("source 写歪时退回 PLAYER", "PLAYER".equals(bob.lastSoundSource()));
+
+        // source 写 master 要认
+        final Map<String, Object> master = defaultOverrides();
+        master.put("sound.enabled", Boolean.TRUE);
+        master.put("sound.target.source", "master");
+        reconfig(master);
+        bob.clear();
+        service.send(alice.source, "Bob", "滑块 master");
+        check("source = master 生效（大小写不敏感也认）", "MASTER".equals(bob.lastSoundSource()));
         reconfig(defaultOverrides());
 
         System.out.println();

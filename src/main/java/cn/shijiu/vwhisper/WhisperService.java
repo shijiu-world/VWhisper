@@ -3,8 +3,6 @@ package cn.shijiu.vwhisper;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
-import net.kyori.adventure.key.Key;
-import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.Style;
@@ -236,9 +234,16 @@ public final class WhisperService {
             target.sendMessage(toTarget);
         }
 
-        // ⚠️ 提示音放在最后：以前它夹在中间，一旦 Key.key() 因为名字非法抛异常，
+        // ⚠️ 提示音放在最后：以前它夹在中间，一旦音效 id 非法抛异常，
         //    后面的 reply 记忆 / 窥屏 / 控制台日志就整段不执行了（消息本体倒已经发出去）。
-        playSound(config, target);
+        //    现在 id 在起服就校验过了，这里只剩 playSound 本身的兜底。
+        // 🔴 自言自语不响 —— 「提醒」这个语义只在【别人】发给你的时候成立
+        if (!self) {
+            playCue(config, config.soundTarget(), target);
+            if (sender != null) {
+                playCue(config, config.soundSender(), sender);
+            }
+        }
 
         // /reply 记忆：双方都记，谁都能接着 /r。
         // ⚠️ 自言自语不记 —— 否则 /r 会指向自己，再也回不到上一个真正聊过的人
@@ -258,21 +263,20 @@ public final class WhisperService {
     }
 
     /**
-     * 给对方放个提示音。
+     * 给某个人放一档提示音。
      *
-     * <p>音效 id 写歪（大写字母、空格、非法符号）时 {@code Key.key()} 会抛异常，
-     * 「叮」一声没响不值得搭上整条消息的后半段，所以这里吃掉并只报一次。
+     * <p>两个开关都要过：总闸 {@code [sound].enabled} 和这一档自己的 {@code enabled}。
+     * 「叮」一声没响不值得搭上整条消息的后半段，所以异常照样吃掉、只报一次。
      */
-    private void playSound(final Configuration config, final Player target) {
-        if (!config.soundEnabled()) {
+    private void playCue(final Configuration config, final SoundCue cue, final Player player) {
+        if (cue == null || player == null || !cue.enabled() || !config.soundEnabled()) {
             return;
         }
         try {
-            target.playSound(Sound.sound(Key.key(config.soundName()), Sound.Source.PLAYER,
-                    config.soundVolume(), config.soundPitch()));
+            player.playSound(cue.sound());
         } catch (final Throwable ex) {
             if (!warnedSound) {
-                logger.warn("[vwhisper] 提示音放不出来（检查 sound.name 是不是合法的音效 id）：" + ex);
+                logger.warn("[vwhisper] 提示音放不出来（检查 [sound] 里的 name 是不是合法的音效 id）：" + ex);
                 warnedSound = true;
             }
         }
@@ -302,6 +306,7 @@ public final class WhisperService {
                 spy = render(config, config.formatSpy(), placeholders, message, senderName);
             }
             watcher.sendMessage(spy);
+            playCue(config, config.soundSpy(), watcher);
         }
     }
 

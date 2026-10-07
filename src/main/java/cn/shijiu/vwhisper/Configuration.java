@@ -2,8 +2,6 @@ package cn.shijiu.vwhisper;
 
 import org.slf4j.Logger;
 
-import net.kyori.adventure.key.Key;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -26,9 +24,6 @@ import java.util.Map;
  * 所以这里所有取值都带默认值，{@link #load} 出错时返回 error 而不是 null 之后裸奔。
  */
 public final class Configuration {
-
-    /** 默认提示音 —— 配错了（或留空）就退回它。 */
-    private static final String DEFAULT_SOUND = "minecraft:entity.experience_orb.pickup";
 
     /** 加载结果：config 可能为旧的（出错时），error 不为空说明这次没能读成。 */
     public static final class LoadResult {
@@ -75,10 +70,14 @@ public final class Configuration {
     /** 能不能给自己发私聊（自言自语）。 */
     private final boolean allowSelfMessage;
     private final long cooldownSeconds;
+    /** 提示音总闸；false 时三档都不响（各档自己的 enabled 也要为真才响）。 */
     private final boolean soundEnabled;
-    private final String soundName;
-    private final float soundVolume;
-    private final float soundPitch;
+    /** 收到私聊的人听到的。 */
+    private final SoundCue soundTarget;
+    /** 发出私聊的人听到的回执音。 */
+    private final SoundCue soundSender;
+    /** 开着 /spy 窥屏的人听到的。 */
+    private final SoundCue soundSpy;
     private final boolean saveIgnores;
     private final boolean saveToggles;
     private final boolean autoReload;
@@ -133,12 +132,33 @@ public final class Configuration {
 
         this.cooldownSeconds = Math.max(0L, TomlLite.integer(m, "cooldown.seconds", 0L));
         this.soundEnabled = TomlLite.bool(m, "sound.enabled", true);
-        // ⚠️ 音效 id 起服就校验：Key.key() 拒绝大写字母 / 空格 / 非法符号，写歪了会
-        //    每发一条私聊抛一次异常。以前是等到 runtime 才炸，还连带吞掉 reply 记忆。
-        final String sound = TomlLite.string(m, "sound.name", DEFAULT_SOUND).trim();
-        this.soundName = validKey(sound) ? sound : DEFAULT_SOUND;
-        this.soundVolume = (float) TomlLite.decimal(m, "sound.volume", 1.0D);
-        this.soundPitch = (float) TomlLite.decimal(m, "sound.pitch", 1.0D);
+
+        // 🔴 升级兜底：v1.2.0 之前只有一组 [sound]（enabled / name / volume / pitch），
+        //    它其实就是「接收者」那一档。新键优先、老键兜底 —— 老配置升级上来音效不变
+        //    （否则服主自己改过的音效名会被静默重置成默认值，日志里还看不出来）。
+        //    sender / spy 两档是新加的，默认关着，不打扰。
+        final String legacyName = TomlLite.string(m, "sound.name", SoundCue.DEFAULT_NAME);
+        final float legacyVolume = (float) TomlLite.decimal(m, "sound.volume", 1.0D);
+        final float legacyPitch = (float) TomlLite.decimal(m, "sound.pitch", 1.0D);
+
+        this.soundTarget = SoundCue.of(
+                TomlLite.bool(m, "sound.target.enabled", this.soundEnabled),
+                TomlLite.string(m, "sound.target.name", legacyName),
+                (float) TomlLite.decimal(m, "sound.target.volume", legacyVolume),
+                (float) TomlLite.decimal(m, "sound.target.pitch", legacyPitch),
+                TomlLite.string(m, "sound.target.source", "player"));
+        this.soundSender = SoundCue.of(
+                TomlLite.bool(m, "sound.sender.enabled", false),
+                TomlLite.string(m, "sound.sender.name", SoundCue.DEFAULT_NAME),
+                (float) TomlLite.decimal(m, "sound.sender.volume", 1.0D),
+                (float) TomlLite.decimal(m, "sound.sender.pitch", 1.0D),
+                TomlLite.string(m, "sound.sender.source", "player"));
+        this.soundSpy = SoundCue.of(
+                TomlLite.bool(m, "sound.spy.enabled", false),
+                TomlLite.string(m, "sound.spy.name", SoundCue.DEFAULT_NAME),
+                (float) TomlLite.decimal(m, "sound.spy.volume", 1.0D),
+                (float) TomlLite.decimal(m, "sound.spy.pitch", 1.0D),
+                TomlLite.string(m, "sound.spy.source", "player"));
 
         this.saveIgnores = TomlLite.bool(m, "storage.save-ignores", true);
         this.saveToggles = TomlLite.bool(m, "storage.save-toggles", true);
@@ -335,23 +355,6 @@ public final class Configuration {
         return prefix + text;
     }
 
-    /**
-     * 这个字符串能不能当 adventure 的 {@code Key} 用。
-     *
-     * <p>{@code Key.key()} 要求 {@code [a-z0-9_.-]}: （不允许大写、空格），
-     * 从 wiki 上抄一个带大写的 id 下来就会抛 {@code InvalidKeyException}。
-     */
-    private static boolean validKey(final String candidate) {
-        if (candidate == null || candidate.isEmpty()) {
-            return false;
-        }
-        try {
-            return !Key.key(candidate).asString().isEmpty();
-        } catch (final Throwable t) {
-            return false;
-        }
-    }
-
     /** 提示语里显示成什么命令名 —— 取配置的第一个主命令别名，没配就用 /vwhisper。 */
     public String label() {
         final String first = rootAliases.isEmpty() ? null : rootAliases.get(0);
@@ -385,20 +388,24 @@ public final class Configuration {
         return cooldownSeconds;
     }
 
+    /** 提示音总闸；false 时三档都不响。 */
     public boolean soundEnabled() {
         return soundEnabled;
     }
 
-    public String soundName() {
-        return soundName;
+    /** 收到私聊的人听到的那一档。 */
+    public SoundCue soundTarget() {
+        return soundTarget;
     }
 
-    public float soundVolume() {
-        return soundVolume;
+    /** 发出私聊的人听到的回执音。 */
+    public SoundCue soundSender() {
+        return soundSender;
     }
 
-    public float soundPitch() {
-        return soundPitch;
+    /** 开着 /spy 窥屏的人听到的那一档。 */
+    public SoundCue soundSpy() {
+        return soundSpy;
     }
 
     public boolean saveIgnores() {

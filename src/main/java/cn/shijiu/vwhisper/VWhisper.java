@@ -196,7 +196,12 @@ public final class VWhisper {
                 + "（strip=剥 / parse=解析 / keep=原样；有 vwhisper.msg.color 权限的一律解析）");
         logger.info("[vwhisper] 子服名单：" + (filter.isWhitelist() ? "白名单" : "黑名单")
                 + (filter.servers().isEmpty() ? "（空 = 全都参与）" : " " + String.join(", ", filter.servers())));
-        logger.info("[vwhisper] 提示音：" + (config.soundEnabled() ? config.soundName() : "关"));
+        logger.info("[vwhisper] 提示音：" + (config.soundEnabled() ? "总闸开" : "总闸关（三档都不响）"));
+        if (config.soundEnabled()) {
+            logger.info("[vwhisper]   收到私聊的人：" + config.soundTarget().describe());
+            logger.info("[vwhisper]   发出私聊的人：" + config.soundSender().describe());
+            logger.info("[vwhisper]   窥屏的人：" + config.soundSpy().describe());
+        }
         logger.info("[vwhisper] 冷却：" + (config.cooldownSeconds() <= 0
                 ? "不限" : config.cooldownSeconds() + " 秒"));
         logger.info("[vwhisper] 悬停/点击：" + (config.tooltipEnabled()

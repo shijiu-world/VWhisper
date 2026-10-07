@@ -161,11 +161,45 @@ seconds = 0
 # 收到私聊时给对方放个提示音。enabled = false 关掉。
 # 音效名是原版 id，留空也可以。
 # ------------------------------------------------------------
+# ------------------------------------------------------------
+# 提示音。分三档，各档独立开关、独立音效：
+#
+#   [sound.target]  收到私聊的人      （默认开 —— 就是「有人私聊你」的提醒）
+#   [sound.sender]  发出私聊的人      （默认关，发件回执音，开着会有点吵）
+#   [sound.spy]     开着 /spy 窥屏的人（默认关）
+#
+# 🔴 自言自语（/msg 自己）一律不响 —— 「提醒」只在【别人】发给你时才成立
+# 🔴 下面的总闸关掉时，三档都不响；各档自己的 enabled 也要为 true 才响
+#
+# name   音效 id。**必须全小写**（minecraft:xxx），大写/空格会让整条音效失效并退回默认值
+#        想用资源包里的自定义音效就写 命名空间:音效名，例如 "mypack:ding"
+# source 走游戏设置里哪个音量滑块：master / music / record / weather / block /
+#        hostile / neutral / player / ambient / voice / ui。写歪退回 player
+#        （提示音归 master 更稳 —— 玩家把「玩家」那栏调静音时私聊提示不会跟着没）
+# ------------------------------------------------------------
 [sound]
+enabled = true
+
+[sound.target]
 enabled = true
 name = "minecraft:entity.experience_orb.pickup"
 volume = 1.0
 pitch = 1.0
+source = "player"
+
+[sound.sender]
+enabled = false
+name = "minecraft:entity.experience_orb.pickup"
+volume = 1.0
+pitch = 1.0
+source = "player"
+
+[sound.spy]
+enabled = false
+name = "minecraft:entity.experience_orb.pickup"
+volume = 1.0
+pitch = 1.0
+source = "player"
 
 # ------------------------------------------------------------
 # 屏蔽名单（/ignore）和「关掉私聊」（/msgtoggle）要不要存下来：

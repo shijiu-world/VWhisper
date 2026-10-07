@@ -10,7 +10,7 @@
 
 - 源码：`D:\Code\mc\plugins\VWhisper`
 - 仓库：`git@github.com:shijiu-world/VWhisper.git`（**走 SSH**，https 会被本机代理掐断 502）
-- 产物：`target/vwhisper-1.1.0.jar`（class 61，Velocity 3.4+ ~ 4.x 通用）
+- 产物：`target/vwhisper-1.2.0.jar`（class 61，Velocity 3.4+ ~ 4.x 通用）
 - 主命令 `/vwhisper`，默认别名 `/vw`；顶层快捷命令接管 `/msg` `/w` `/m` `/tell` `/whisper` `/reply` `/r`
 
 ---
@@ -30,6 +30,7 @@
 | `Permissions.java` | 89 | 权限闸门。`allow-by-default` 只影响 4 个基础节点 | 特权节点（spy/reload/bypass/color）一律要显式给 |
 | `ChatColors.java` | 237 | 自研颜色解析器：`&c` / `&#RRGGBB` / `&x&F&F...` / `{#F00}` / 渐变 | 与 Vmessage 那份**同源但独立**，改语法两边都要改 |
 | `ChatTooltip.java` | 265 | 悬停提示 + 点击动作（`[Tooltip]`）。两档：整条消息 = hover+suggest，正文 = 复制 | 思路对齐 Vmessage 的 `ChatTooltip`，但占位符是 VWhisper 那套 `#xxx#` |
+| `SoundCue.java` | 137 | 一档提示音（`[sound]`）：enabled / name / volume / pitch / source | 🔴 音效 id 在**构造时**校验并预构造 `Sound`，不放进 `sound()` 现算 —— 见下面「提示音」 |
 | `PlainText.java` | 47 | 组件转纯文本（控制台日志用） | 🔴 **不用** `PlainComponentSerializer`，见下 |
 | `TomlLite.java` | 272 | 自研 TOML 解析（~300 行） | 为什么自研：离线 Maven 装不上任何库 |
 | `command/RootCommand.java` | 213 | 唯一命令入口，子命令分发 + Tab 补全 + help | 内部 `Entry` 表把别名映射到子命令；`Invocation` 包装器带实际敲的 alias |
@@ -58,8 +59,9 @@
   ↓   ① 按 [colors].mode + vwhisper.msg.color 权限渲染消息内容
   ↓   ② 拼 [format].sender / .receiver / .console
   ↓        ↳ 拼的过程中：正文先挂「复制」(ChatTooltip.copy)，最后整条挂 hover+suggest (apply)
-  ↓   ③ 给接收者发 + 播提示音；给发送者发回执
-  ↓   ④ 所有开 spy 的人发一份 [format].spy（除 spy.bypass 的人）
+  ↓   ③ 给接收者发 + 播 [sound.target]；给发送者发回执 + 播 [sound.sender]
+  ↓      （🔴 自言自语两档都不播）
+  ↓   ④ 所有开 spy 的人发一份 [format].spy（除 spy.bypass 的人）+ 播 [sound.spy]
   ↓   ⑤ rememberContact(双方) → /reply 可以用了
   ↓   ⑥ log-to-console 开着就往控制台打一行（用 PlainText.of）
 ```
@@ -97,6 +99,27 @@
     `velocity-plugin.json`，写死的话产物里永远是旧版本号（v1.0.2 的 jar 显示 1.0.0 就是这么来的）。
 12. 📌 **`ClickEvent` 没有 `value()`**（新版 adventure 把值收进了 `payload()`，
     `ClickEvent.Payload.Text#value()`）。写测试/新代码时别照着老例子抄。
+13. 📌 **提示音三档：`[sound]` 总闸 + `[sound.target]` / `[sound.sender]` / `[sound.spy]`**。
+    🔴 **自言自语一律不响**（`deliver()` 里 `if (!self)` 包着）——「提醒」只在别人发给你时成立。
+    🔴 **老配置升级兜底**：v1.2.0 之前只有一组 `[sound]`（enabled/name/volume/pitch），
+    读的时候新键优先、**老键兜底**（`TomlLite.string(m, "sound.target.name", legacyName)`），
+    所以服主自己改过的音效不会被静默重置。
+    ⚠️ **测试基线 `defaultOverrides()` 里 `sound.enabled = false`**（免得别的用例被干扰），
+    写音效用例必须自己在 overrides 里把总闸打开 —— 我第一次就是全绿转全红卡在这。
+
+---
+
+## 提示音（`[sound]`）
+
+三档共用 `SoundCue`：`enabled` / `name` / `volume` / `pitch` / `source`。
+
+- 🔴 **音效 id 在构造时校验 + 预构造 `Sound`**，不放进 `sound()` 现算。
+  `Key.key()` 拒绝大写/空格/非法符号，从 wiki 抄一个带大写的 id 就抛 `InvalidKeyException`；
+  等到发消息那一刻才炸会连带吞掉 reply 记忆、窥屏、控制台日志（消息本体倒已经发出去了）。
+  校验不过就退回 `SoundCue.DEFAULT_NAME`，起服一眼能在速览里看出来。
+- 📌 `source` 决定这条音效归游戏设置里哪个音量滑块管（master/music/…/ui，写歪退回 `player`）。
+  提示音设成 `master` 更稳 —— 玩家把「玩家」那栏调静音时，私聊提示不会跟着没。
+- 起服速览在 `VWhisper.reportConfig()` 里，总闸关着时只打一行「总闸关（三档都不响）」，不刷屏。
 
 ---
 
@@ -181,7 +204,7 @@ $out = "D:\tmp\vwtest"
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
 | `SmokeTest` | 56 | TOML 解析（含**无引号值的行尾注释、多行数组、段名行带注释的 `]`**）、颜色/渐变渲染。**必须传 `target/classes/config.toml` 作 `args[0]`** |
-| `ServiceTest` | 86 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`/`ToggleCommand`：权限闸门、接收开关（**含 `/vw toggle on` 方向**）、屏蔽与**存盘往返**、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**#message# 的样式继承**、**悬停/点击（`[Tooltip]` 两档 19 条）** |
+| `ServiceTest` | 103 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`/`ToggleCommand`：权限闸门、接收开关（**含 `/vw toggle on` 方向**）、屏蔽与**存盘往返**、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**#message# 的样式继承**、**悬停/点击（`[Tooltip]` 两档 19 条）**、**提示音三档（17 条，含老配置升级兜底）** |
 | `ClasspathTest` | 3 | 隔离 ClassLoader 只加载 velocity jar + 本项目 classes，验证工具类可加载，**并反向验证旧写法在同一环境确实挂**（否则这测试是自欺欺人） |
 
 > 📌 `TooltipProbe` **不是测试，是排障工具**：传一个配置目录（或 `config.toml` 路径），
@@ -204,7 +227,7 @@ $out = "D:\tmp\vwtest"
 | LuckPerms | **不是硬依赖**。权限走 Velocity 原生 `CommandSource#getPermissionValue`，谁提供权限都行 |
 | PAPIProxyBridge | **不依赖、不用装** |
 
-⚠️ 上线状态：`vwhisper-1.1.0.jar` 已在本地测试服 `D:\game\test_velocity\velocity\plugins\` 就位，
+⚠️ 上线状态：`vwhisper-1.2.0.jar` 已在本地测试服 `D:\game\test_velocity\velocity\plugins\` 就位，
 **线上尚未部署**。
 
 ---

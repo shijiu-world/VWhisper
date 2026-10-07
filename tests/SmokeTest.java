@@ -29,7 +29,8 @@ public class SmokeTest {
         check("子命令别名是数组", ((List<?>) map.get("commands.msg")).contains("w"));
         check("主命令别名默认 vw", ((List<?>) map.get("commands.root")).contains("vw"));
         check("布尔值", TomlLite.bool(map, "sound.enabled", false));
-        check("小数", TomlLite.decimal(map, "sound.volume", 0D) == 1.0D);
+        // ⚠️ v1.2.0 起 [sound] 拆成三档，volume / pitch 归到各档下面了
+        check("小数", TomlLite.decimal(map, "sound.target.volume", 0D) == 1.0D);
         final String selfMsg = TomlLite.string(map, "messages.self-message", "");
         check("带引号的中文提示语", selfMsg.contains("不能给自己发私聊") && !selfMsg.startsWith("\""));
         final Map<String, Object> commentProbe = TomlLite.parse("tip = \"&c测试\" # 这是注释\n");
