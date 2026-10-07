@@ -19,7 +19,7 @@
 
 ## 安装
 
-1. `vwhisper-1.2.0.jar` 丢进代理的 `plugins/` 目录
+1. `vwhisper-1.2.1.jar` 丢进代理的 `plugins/` 目录
 2. 启动代理一次，会自动生成 `plugins/vwhisper/config.toml`
 3. 改完配置用 `/vw reload`（控制台直接敲也行）
 
@@ -228,6 +228,9 @@ name = "minecraft:entity.experience_orb.pickup"
 几点说明：
 
 - 🔴 **自言自语一律不响** —— 「提醒」这个语义只在**别人**发给你的时候成立。
+- 🔴 **需要 1.19.3+ 的客户端，而且玩家得已经进了某个子服**。Velocity 是把音效当「实体音效」发
+  出去的，要拿玩家在后端服的实体 id 当发声点；人在登录中（还没连上后端）时不会响，这是
+  Velocity 的限制，不是配置问题。
 - 📌 `source` 决定这条音效归游戏设置里哪个分类管：`master` / `music` / `record` / `weather` /
   `block` / `hostile` / `neutral` / `player` / `ambient` / `voice` / `ui`，写歪退回 `player`。
   想让私聊提示**不受玩家调音量影响**，把它设成 `master`。
@@ -286,7 +289,7 @@ cd D:\Code\mc\plugins\VWhisper
 JAVA_HOME=D:/Code/Java/zulu25.34.17-ca-jdk25.0.3-win_x64 mvn -B -o clean package
 ```
 
-产物：`target/vwhisper-1.2.0.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
+产物：`target/vwhisper-1.2.1.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
 
 > 构建为什么必须零依赖：本机 Maven 是离线的，装不上 maven-shade 插件，打不进第三方库，
 > 所以连 TOML 解析都是自己写的（`TomlLite`，~300 行，格式写错也只是取到默认值，不会把插件搞挂）。
@@ -314,7 +317,7 @@ $out = "D:\tmp\vwtest"
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
 | `SmokeTest` | 56 | TOML 解析、颜色/渐变渲染（**要传 `target/classes/config.toml` 作 `args[0]`**） |
-| `ServiceTest` | 103 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**悬停/点击（`[Tooltip]` 两档）**、**提示音三档（含老配置升级兜底）** |
+| `ServiceTest` | 105 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**悬停/点击（`[Tooltip]` 两档）**、**提示音三档（含老配置升级兜底）** |
 | `ClasspathTest` | 3 | 运行环境校验，见下 |
 
 > `ConfigProbe` **不是测试**，是排障工具：给它一个配置目录（或 `config.toml` 路径），

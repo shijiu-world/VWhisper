@@ -10,7 +10,7 @@
 
 - 源码：`D:\Code\mc\plugins\VWhisper`
 - 仓库：`git@github.com:shijiu-world/VWhisper.git`（**走 SSH**，https 会被本机代理掐断 502）
-- 产物：`target/vwhisper-1.2.0.jar`（class 61，Velocity 3.4+ ~ 4.x 通用）
+- 产物：`target/vwhisper-1.2.1.jar`（class 61，Velocity 3.4+ ~ 4.x 通用）
 - 主命令 `/vwhisper`，默认别名 `/vw`；顶层快捷命令接管 `/msg` `/w` `/m` `/tell` `/whisper` `/reply` `/r`
 
 ---
@@ -121,6 +121,28 @@
   提示音设成 `master` 更稳 —— 玩家把「玩家」那栏调静音时，私聊提示不会跟着没。
 - 起服速览在 `VWhisper.reportConfig()` 里，总闸关着时只打一行「总闸关（三档都不响）」，不刷屏。
 
+### 🔴🔴 必须调 `playSound(Sound, Emitter)`，单参数那个是空实现
+
+`Player#playSound(Sound)`（以及带 xyz 坐标那个）在 Velocity 里**方法体是空的** —— 不报错、
+不出声、不打日志，配置全对也照样静音。真正被 `ConnectedPlayer` 实现、会发出
+`ClientboundSoundEntityPacket` 的只有 **`playSound(Sound, Emitter)`**，emitter 传
+`Sound.Emitter.self()`（adventure 里它是单例，Velocity 内部用 `==` 比对，安全）。
+
+> 官方口径：<https://docs.papermc.io/velocity/dev/pitfalls/>
+> “Player#playSound(Sound) is not implemented, as Adventure’s contract requires sounds
+> to play at the player’s current position.”
+
+配套的两条限制（都是 Velocity 侧 `ConnectedPlayer.playSound` 里的早退分支）：
+
+- 客户端 **< 1.19.3** 直接 `return`，不发；
+- emitter 为 self 时拿 `getConnectedServer()` 的实体 id 当发声点 ——
+  玩家**还没连上后端服**时 `return`。所以 `playCue()` 里先判 `getCurrentServer().isEmpty()` 再调，
+  免得白跑一趟（也避免 `getEntityId()` 为 null 时抛 NPE 被 catch 记一条没意义的 warn）；
+- emitter 若传**另一个玩家**，两人必须**在同一个子服**，否则同样静默 `return`。
+
+`ServiceTest` 里 `Fake.soundsUsedEmitter()` 会记录每次 `playSound` 的参数个数并断言等于 2 ——
+**桩里只比对 `Sound` 对象是测不出这个 bug 的**（旧代码就是这么漏过去的）。
+
 ---
 
 ## 🔴 颜色继承：`#message#` 是兄弟节点，不是子节点
@@ -204,7 +226,7 @@ $out = "D:\tmp\vwtest"
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
 | `SmokeTest` | 56 | TOML 解析（含**无引号值的行尾注释、多行数组、段名行带注释的 `]`**）、颜色/渐变渲染。**必须传 `target/classes/config.toml` 作 `args[0]`** |
-| `ServiceTest` | 103 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`/`ToggleCommand`：权限闸门、接收开关（**含 `/vw toggle on` 方向**）、屏蔽与**存盘往返**、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**#message# 的样式继承**、**悬停/点击（`[Tooltip]` 两档 19 条）**、**提示音三档（17 条，含老配置升级兜底）** |
+| `ServiceTest` | 105 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`/`ToggleCommand`：权限闸门、接收开关（**含 `/vw toggle on` 方向**）、屏蔽与**存盘往返**、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**#message# 的样式继承**、**悬停/点击（`[Tooltip]` 两档 19 条）**、**提示音三档（19 条，含老配置升级兜底 + 必须走带 Emitter 的重载）** |
 | `ClasspathTest` | 3 | 隔离 ClassLoader 只加载 velocity jar + 本项目 classes，验证工具类可加载，**并反向验证旧写法在同一环境确实挂**（否则这测试是自欺欺人） |
 
 > 📌 `ConfigProbe` **不是测试，是排障工具**：传一个配置目录（或 `config.toml` 路径），
@@ -228,7 +250,7 @@ $out = "D:\tmp\vwtest"
 | LuckPerms | **不是硬依赖**。权限走 Velocity 原生 `CommandSource#getPermissionValue`，谁提供权限都行 |
 | PAPIProxyBridge | **不依赖、不用装** |
 
-⚠️ 上线状态：`vwhisper-1.2.0.jar` 已在本地测试服 `D:\game\test_velocity\velocity\plugins\` 就位，
+⚠️ 上线状态：`vwhisper-1.2.1.jar` 已在本地测试服 `D:\game\test_velocity\velocity\plugins\` 就位，
 **线上尚未部署**。
 
 ---

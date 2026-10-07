@@ -64,6 +64,8 @@ public class ServiceTest {
         final List<Component> inbox = new ArrayList<>();
         /** 听到过的提示音。 */
         final List<Sound> sounds = new ArrayList<>();
+        /** 每次 playSound 收到的参数个数 —— 用来断言走的是带 Emitter 的重载。 */
+        final List<Integer> soundArity = new ArrayList<>();
         final CommandSource source;
         final Player player;
 
@@ -86,9 +88,12 @@ public class ServiceTest {
                         return null;
                     case "playSound":
                         // ⚠️ Audience 里 playSound 有好几个重载（带坐标的、带 emitter 的），
-                        //    只认第一个参数是 Sound 的那个
+                        //    只认第一个参数是 Sound 的那个。
+                        // 🔴 arity 也记下来：Velocity 只实现了两参数的 playSound(Sound, Emitter)，
+                        //    单参数那个是空实现 —— 只比对 Sound 对象的话这个 bug 测不出来
                         if (args != null && args[0] instanceof Sound) {
                             sounds.add((Sound) args[0]);
+                            soundArity.add(args.length);
                         }
                         return null;
                     case "toString": return "Fake(" + name + ")";
@@ -144,11 +149,30 @@ public class ServiceTest {
         void clear() {
             inbox.clear();
             sounds.clear();
+            soundArity.clear();
         }
 
         /** 听到过几个提示音。 */
         int soundCount() {
             return sounds.size();
+        }
+
+        /**
+         * 提示音是不是都走的两参数重载 {@code playSound(Sound, Emitter)}。
+         *
+         * <p>单参数的 {@code playSound(Sound)} 在 Velocity 里是空实现：不报错、不出声 ——
+         * 正是"配置开了却没声音"的根因，所以这条要钉死。
+         */
+        boolean soundsUsedEmitter() {
+            if (sounds.isEmpty()) {
+                return true;
+            }
+            for (final int arity : soundArity) {
+                if (arity != 2) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         /** 最后一个提示音的 id；没听到过就 null。 */
@@ -752,6 +776,10 @@ public class ServiceTest {
         check("默认：只有收到私聊的人听到提示音", bob.soundCount() == 1 && alice.soundCount() == 0);
         check("  听到的是默认音效", "minecraft:entity.experience_orb.pickup".equals(bob.lastSound()));
         check("  默认走 player 滑块", "PLAYER".equals(bob.lastSoundSource()));
+        // 🔴 回归：v1.2.0 及以前调的是单参数 playSound(Sound)，Velocity 里那是空实现 →
+        //    配置全对但就是不出声。必须走两参数的 playSound(Sound, Emitter)
+        check("  走的是带 Emitter 的重载（单参数那个在 Velocity 里是空实现）",
+                bob.soundsUsedEmitter() && alice.soundsUsedEmitter());
 
         // 自言自语不该响 —— 「提醒」只在别人发给你时才成立
         alice.clear();
@@ -782,6 +810,8 @@ public class ServiceTest {
                 bob.lastSound() != null && alice.lastSound() != null && listener.lastSound() != null
                         && !bob.lastSound().equals(alice.lastSound())
                         && !alice.lastSound().equals(listener.lastSound()));
+        check("  三档都走带 Emitter 的重载",
+                bob.soundsUsedEmitter() && alice.soundsUsedEmitter() && listener.soundsUsedEmitter());
         store.setSpying(listener.uuid, false);
 
         // 总闸关掉：三档都不响

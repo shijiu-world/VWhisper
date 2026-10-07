@@ -7,6 +7,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.sound.Sound;
 import org.slf4j.Logger;
 
 import java.util.ArrayDeque;
@@ -272,8 +273,17 @@ public final class WhisperService {
         if (cue == null || player == null || !cue.enabled() || !config.soundEnabled()) {
             return;
         }
+        // 还没真正进到某个后端服 —— Velocity 那边拿不到 emitter 实体 id，放了也是白放
+        if (player.getCurrentServer().isEmpty()) {
+            return;
+        }
         try {
-            player.playSound(cue.sound());
+            // 🔴 必须调【带 Emitter】的这个重载。单参数的 playSound(Sound) 在 Velocity 里是
+            //    空实现（adventure 的契约要求音效在玩家当前位置播放，代理没这个信息），
+            //    调它不报错、不出声，从外面看就是"配置开了却没声音"。
+            //    只有 playSound(Sound, Emitter) 被 ConnectedPlayer 真正实现并发出包。
+            //    见 https://docs.papermc.io/velocity/dev/pitfalls/
+            player.playSound(cue.sound(), Sound.Emitter.self());
         } catch (final Throwable ex) {
             if (!warnedSound) {
                 logger.warn("[vwhisper] 提示音放不出来（检查 [sound] 里的 name 是不是合法的音效 id）：" + ex);
