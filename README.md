@@ -19,7 +19,7 @@
 
 ## 安装
 
-1. `vwhisper-1.2.1.jar` 丢进代理的 `plugins/` 目录
+1. `vwhisper-1.2.2.jar` 丢进代理的 `plugins/` 目录
 2. 启动代理一次，会自动生成 `plugins/vwhisper/config.toml`
 3. 改完配置用 `/vw reload`（控制台直接敲也行）
 
@@ -30,13 +30,13 @@
 
 | 命令 | 子命令别名 | 说明 |
 | --- | --- | --- |
-| `/vw msg <玩家> <消息>` | `m` `pm` `tell` `w` `whisper` | 发私聊（跨服，人在哪个服都收得到） |
+| `/vw msg <玩家> <消息>` | `m` `tell` `w` `whisper` | 发私聊（跨服，人在哪个服都收得到） |
 | `/vw reply <消息>` | `r` | 回复最近跟自己聊过的人（两边都能接着回） |
-| `/vw toggle [on\|off]` | `msgtoggle` `togglemsg` `tmsg` | 开关接收私聊 |
+| `/vw toggle [on\|off]` | `msgtoggle` | 开关接收私聊 |
 | `/vw ignore <玩家>` | — | 屏蔽 / 取消屏蔽 |
-| `/vw spy [on\|off]` | `socialspy` `msgspy` | 私聊窥屏 |
-| `/vw reload` | `rl` | 重载配置 |
-| `/vw version` | `info` `ver` | 显示版本 |
+| `/vw spy [on\|off]` | `msgspy` | 私聊窥屏 |
+| `/vw reload` | — | 重载配置 |
+| `/vw version` | `info` | 显示版本 |
 | `/vw help` | `?` | 看这个列表（不带参数敲 `/vw` 也一样） |
 
 主命令的别名和每个子命令的别名都在 `config.toml` 的 `[commands]` 里改：
@@ -44,7 +44,7 @@
 ```toml
 [commands]
 root = ["vw"]                       # 想叫别的就改这里；写 [] 就只用 /vwhisper
-msg = ["m", "pm", "tell", "w", "whisper"]
+msg = ["m", "tell", "w", "whisper"]
 ```
 
 ⚠️ 主命令名固定小写：Velocity 底层 Brigadier 的 literal 节点大小写敏感，
@@ -289,7 +289,7 @@ cd D:\Code\mc\plugins\VWhisper
 JAVA_HOME=D:/Code/Java/zulu25.34.17-ca-jdk25.0.3-win_x64 mvn -B -o clean package
 ```
 
-产物：`target/vwhisper-1.2.1.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
+产物：`target/vwhisper-1.2.2.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
 
 > 构建为什么必须零依赖：本机 Maven 是离线的，装不上 maven-shade 插件，打不进第三方库，
 > 所以连 TOML 解析都是自己写的（`TomlLite`，~300 行，格式写错也只是取到默认值，不会把插件搞挂）。

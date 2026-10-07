@@ -222,13 +222,13 @@ save-toggles = true
 # ------------------------------------------------------------
 [commands]
 root = ["vw"]
-msg = ["m", "pm", "tell", "w", "whisper"]
+msg = ["m", "tell", "w", "whisper"]
 reply = ["r"]
-toggle = ["msgtoggle", "togglemsg", "tmsg"]
+toggle = ["msgtoggle"]
 ignore = []
-spy = ["socialspy", "msgspy"]
-reload = ["rl"]
-version = ["info", "ver"]
+spy = ["msgspy"]
+reload = []
+version = ["info"]
 help = ["?"]
 
 # ------------------------------------------------------------
