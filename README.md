@@ -308,7 +308,7 @@ $out = "D:\tmp\vwtest"
 & "$jdk\java.exe" -cp "$cp;$out" ServiceTest
 & "$jdk\java.exe" -cp "$cp;$out" ClasspathTest D:\game\test_velocity\velocity\velocity-4.1.0-SNAPSHOT-16.jar
 # 不是测试，是工具：打印【某份真实配置】解析出来的值，用来验证线上/测试服配置没写错
-& "$jdk\java.exe" -cp "$cp;$out" TooltipProbe D:\game\test_velocity\velocity\plugins\vwhisper
+& "$jdk\java.exe" -cp "$cp;$out" ConfigProbe D:\game\test_velocity\velocity\plugins\vwhisper
 ```
 
 | 测试 | 断言 | 覆盖 |
@@ -317,9 +317,10 @@ $out = "D:\tmp\vwtest"
 | `ServiceTest` | 103 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**悬停/点击（`[Tooltip]` 两档）**、**提示音三档（含老配置升级兜底）** |
 | `ClasspathTest` | 3 | 运行环境校验，见下 |
 
-> `TooltipProbe` **不是测试**，是排障工具：给它一个配置目录（或 `config.toml` 路径），
-> 它用插件自己的 `Configuration.load()` 读一遍，把 `[Tooltip]` 各键解析出来的值打出来。
-> 换 jar / 改完线上配置后跑一下，能确认「配置真的读进去了」而不用起服。
+> `ConfigProbe` **不是测试**，是排障工具：给它一个配置目录（或 `config.toml` 路径），
+> 它用插件自己的 `Configuration.load()` 读一遍，把 `[Tooltip]`、`[sound]` 三档、
+> 三个 `format` 串解析出来的值打出来。换 jar / 改完线上配置后跑一下，
+> 能确认「配置真的读进去了」而不用起服。
 > ⚠️ 它的 classpath 要额外带上 `slf4j-api`（`Configuration.load()` 要 `Logger`）。
 
 > `ClasspathTest` 是 `/msg` 一次实机崩溃之后补的。它用一个**只看得见 velocity jar + 本项目 classes**
