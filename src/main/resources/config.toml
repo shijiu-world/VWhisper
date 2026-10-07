@@ -50,6 +50,10 @@ allow-self-message = true
 # ⚠️ 渐变不单独设权限 —— 能用颜色就能用渐变。
 #
 # parse 支持的写法（对齐 CMI/CMILib）：
+# ★ 这套写法在两处都生效 —— 玩家打的私聊内容（受上面的 mode 约束），
+#   以及 [format] 私聊模板 / [tooltip].hover / 插件提示文案
+#   （那些是管理员和插件给的东西，恒按 parse 处理，不受 mode 约束）
+# ⚠️ format.minimessage = true 时不适用（那是 <red> 语法）
 #   &4  &c  &l  &r ...        传统 16 色 + k/l/m/n/o/r
 #   &#FF0000  &#F00           hex（3 位会自动展开成 6 位）
 #   #FF0000                   裸 hex —— 前面不写 & 也认（只认 6 位；

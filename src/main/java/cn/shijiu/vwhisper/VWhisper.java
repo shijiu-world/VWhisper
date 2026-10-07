@@ -243,7 +243,7 @@ public final class VWhisper {
 
     /** 发一条带 & 颜色码的文本。 */
     public void send(final CommandSource source, final String legacy) {
-        source.sendMessage(ChatColors.SERIALIZER.deserialize(legacy));
+        source.sendMessage(ChatColors.format(legacy));
     }
 
     /** Tab 补全用：在线玩家名（按前缀过滤，小写比较）。 */

@@ -159,6 +159,15 @@ sender = "&8[&7我 &8→ &7#target#&8]&r #message#"     # 消息不带颜色 →
 早期版本为了躲开 `#FF0000AA`（8 位带 alpha）加了「后面不能跟 hex 字符」的限制，
 结果把玩家真正会打的 `#00ff001` 一起挡掉了，现在一律按「前 6 位是颜色、剩下的是文字」处理。
 
+#### 格式串（format / hover / 插件提示）也认全套写法
+
+`[format]` 的私聊模板、`[tooltip].hover`、插件自己的提示文案，走**同一套**语法，
+而且**恒按 parse 处理**，不吃 `[colors].mode`、也不看 `vwhisper.msg.color` 权限 ——
+这些是管理员配的 / 插件拼的，不能因为收消息的人没颜色权限就把「谁发给谁」那一段的颜色一起剥掉。
+
+📌 v1.4.0 起才这样。以前格式串只认 `&c` / `&#RRGGBB`，裸 hex、CMI 花括号、渐变会**原样显示**。
+⚠️ `format.minimessage = true` 时不走这套（那是 `<red>` 语法）。
+
 > 没有称号/前缀/`%xxx%` 之类的占位符：私聊是代理绕过子服直接发的，子服的 PlaceholderAPI
 > 变量在代理端拿不到，硬要就要额外装 PAPIProxyBridge 并多一次跨服往返 —— 不值。
 > 想让称号出现在聊天里是子服那边 `Chat.GeneralFormat` 的事，这里不掺和。
@@ -308,7 +317,7 @@ cd D:\Code\mc\plugins\VWhisper
 JAVA_HOME=D:/Code/Java/zulu25.34.17-ca-jdk25.0.3-win_x64 mvn -B -o clean package
 ```
 
-产物：`target/vwhisper-1.3.1.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
+产物：`target/vwhisper-1.4.0.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
 
 > 构建为什么必须零依赖：本机 Maven 是离线的，装不上 maven-shade 插件，打不进第三方库，
 > 所以连 TOML 解析都是自己写的（`TomlLite`，~300 行，格式写错也只是取到默认值，不会把插件搞挂）。
@@ -335,7 +344,7 @@ $out = "D:\tmp\vwtest"
 
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
-| `SmokeTest` | 64 | TOML 解析、颜色/渐变渲染（含**裸 hex `#RRGGBB`** 8 条）（**要传 `target/classes/config.toml` 作 `args[0]`**） |
+| `SmokeTest` | 70 | TOML 解析、颜色/渐变渲染（含**裸 hex `#RRGGBB`** 8 条）（**要传 `target/classes/config.toml` 作 `args[0]`**） |
 | `ServiceTest` | 105 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**悬停/点击（`[Tooltip]` 两档）**、**提示音三档（含老配置升级兜底）** |
 | `ClasspathTest` | 3 | 运行环境校验，见下 |
 

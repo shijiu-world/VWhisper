@@ -433,7 +433,10 @@ public final class WhisperService {
             if (config.miniMessage()) {
                 return net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(text);
             }
-            return ChatColors.SERIALIZER.deserialize(text);
+            // & 码模式下多过一遍 ChatColors：格式串里（含 hover / 提示文案）完全可能是
+            // CMI 那套写法（裸 #RRGGBB、{#RRGGBB}、渐变），不过一遍就原样显示给玩家了。
+            // ⚠️ MiniMessage 模式不能过（那是 <red> 语法，补 & 会破坏标签）
+            return ChatColors.format(text);
         } catch (final Throwable t) {
             if (!warnedParse) {
                 logger.warn("[vwhisper] 格式串解析失败，已按纯文本发送: " + t);

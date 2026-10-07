@@ -189,7 +189,8 @@ adventure 的样式只从**父**往下传，兄弟之间不传。`&7` 只染了�
 | 加子命令 | `command/` 新类 + `RootCommand` 的 `Entry` 表 | `[commands]` 段、`[shortcuts]`（可选）、help 文案 |
 | 加/改提示语 | `config.toml` 的 `[messages]` | `#label#` 会自动换成实际命令名，别硬写 `/vw` |
 | 颜色/渐变语法 | `ChatColors.java` | ⚠️ Vmessage 有一份独立拷贝，两边都要改 |
-| 裸 hex `#RRGGBB` | `ChatColors.BARE_HEX_6` | 🔴 两个断言 `(?<![&§{])` / `(?![0-9a-fA-F])` 缺一不可；在 `STRIP` 里**必须排最后**、`normalize()` 里**最后一步**。只认 6 位（裸 3 位 `#666` 是网络用语，会误伤） |
+| 裸 hex `#RRGGBB` | `ChatColors.BARE_HEX_6` | 🔴 正则 = `(?<![&§{])#([0-9a-fA-F]{6})`，头部断言不能拆；**尾部刻意不加** `(?![0-9a-fA-F])`（加了会把 `#00ff001`「绿字1」全挡掉）。在 `STRIP` 里**必须排最后**、`normalize()` 里**最后一步**。只认 6 位（裸 3 位 `#666` 是网络用语，会误伤） |
+| 格式串解析 | `ChatColors.format()` | 🔴 私聊模板 / hover / 提示文案走它，**恒按 parse**，不吃 `[colors].mode`；以前用 `SERIALIZER.deserialize` 只认 `&c`/`&#RRGGBB`。`minimessage=true` 时不能过 ChatColors |
 | `#message# 的颜色/装饰怎么带 | `WhisperService.styleAt/carry/walk` | 见上节。`parse()` 解析失败会退成纯文本，探针也会跟着退化 → 拿不到样式 → 兜底不染色，不会炸 |
 | 权限判定 | `Permissions.java` | 注意 `allow-by-default` 只覆盖 4 个基础节点 |
 | 存盘格式 | `Store.java` | 纯文本一行一条 UUID，肉眼可读；改格式要考虑旧文件兼容 |
@@ -226,7 +227,7 @@ $out = "D:\tmp\vwtest"
 
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
-| `SmokeTest` | 64 | TOML 解析（含**无引号值的行尾注释、多行数组、段名行带注释的 `]`**）、颜色/渐变渲染。**必须传 `target/classes/config.toml` 作 `args[0]`** |
+| `SmokeTest` | 70 | TOML 解析（含**无引号值的行尾注释、多行数组、段名行带注释的 `]`**）、颜色/渐变渲染。**必须传 `target/classes/config.toml` 作 `args[0]`** |
 | `ServiceTest` | 105 | 用动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`/`ToggleCommand`：权限闸门、接收开关（**含 `/vw toggle on` 方向**）、屏蔽与**存盘往返**、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**#message# 的样式继承**、**悬停/点击（`[Tooltip]` 两档 19 条）**、**提示音三档（19 条，含老配置升级兜底 + 必须走带 Emitter 的重载）** |
 | `ClasspathTest` | 3 | 隔离 ClassLoader 只加载 velocity jar + 本项目 classes，验证工具类可加载，**并反向验证旧写法在同一环境确实挂**（否则这测试是自欺欺人） |
 

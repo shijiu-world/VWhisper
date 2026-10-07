@@ -99,6 +99,14 @@ public class SmokeTest {
         final Component parsed = ChatColors.component("parse", "&c红");
         check("parse 模式真的上色了", parsed.color() != null && parsed.color().value() == 0xFF5555);
 
+        // ---- 格式串（format / hover / 提示文案）也认全套写法 ----
+        // 以前只认 &c / &#RRGGBB，裸 hex 和 {#RRGGBB} 会原样显示给玩家
+        check("格式串裸 hex 上色", firstColor(ChatColors.format("#FF0000红")) == 0xFF0000);
+        check("格式串 CMI 花括号上色", firstColor(ChatColors.format("{#FF0000}红")) == 0xFF0000);
+        check("格式串 &c 照旧上色", firstColor(ChatColors.format("&c红")) == 0xFF5555);
+        check("格式串渐变不留标记", letPlain(ChatColors.format("{#FF0000>}嘿{#0000FF<}")).equals("嘿"));
+        check("格式串始终 parse（不吃 colors 配置）", firstColor(ChatColors.format("#00ff00绿")) == 0x00FF00);
+
         // ---- 渐变 ----
         final Component gradient = ChatColors.component("parse", "{#FF0000>}嘿{#0000FF<}");
         final String plain = letPlain(gradient);
@@ -158,6 +166,20 @@ public class SmokeTest {
 
     private static String letPlain(final Component c) {
         return PlainText.of(c);
+    }
+
+    /** 组件树里第一个非空颜色（RGB），没上色返回 -1 */
+    private static int firstColor(final net.kyori.adventure.text.Component c) {
+        if (c.color() != null) {
+            return c.color().value();
+        }
+        for (final net.kyori.adventure.text.Component child : c.children()) {
+            final int v = firstColor(child);
+            if (v >= 0) {
+                return v;
+            }
+        }
+        return -1;
     }
 
     private static int countColored(final Component c) {

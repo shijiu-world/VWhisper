@@ -125,6 +125,26 @@ public final class ChatColors {
         return result;
     }
 
+    /**
+     * 解析 <b>格式串</b>：私聊的 {@code format}、悬停提示 {@code hover}、插件自己的提示文案。
+     *
+     * <p>跟 {@link #component} 的区别：那是玩家打的私聊内容，受 {@code colors} 配置和
+     * {@code vwhisper.msg.color} 权限约束（strip 时颜色码会被摘掉）；而格式串是管理员写在配置里的、
+     * 提示文案是插件自己拼的，<b>一律按 parse 处理</b> ——
+     * 否则没颜色权限的玩家连「谁发给谁」那一段的颜色都会一起丢掉。
+     *
+     * <p>支持的写法跟私聊内容完全一致（因为同样过一遍 {@link #normalize}）：
+     * {@code &c} / {@code &#RRGGBB} / {@code &#RGB} / 裸 {@code #RRGGBB} /
+     * {@code {#RRGGBB}} / {@code {#RGB}} / {@code {#A>}渐变{#B<}}。
+     * 以前这里只认 {@code &c} 和 {@code &#RRGGBB}，其余写法会原样显示给玩家。
+     *
+     * <p>⚠️ MiniMessage 模式（{@code format.minimessage = true}）<b>不要</b>走这里 ——
+     * 那是 {@code <red>} 语法，把 {@code &} 补进裸 hex 会破坏标签结构。
+     */
+    public static Component format(final String text) {
+        return component("parse", text);
+    }
+
     /** 把各种写法归一化成 legacy 串，只做字符串变换 —— 便于单独测试。 */
     public static String normalize(final String s) {
         if (s == null) {

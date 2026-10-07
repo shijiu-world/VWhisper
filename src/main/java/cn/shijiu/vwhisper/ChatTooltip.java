@@ -214,7 +214,7 @@ public final class ChatTooltip {
         if (cfg != null && cfg.miniMessage()) {
             return net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().deserialize(text);
         }
-        return ChatColors.SERIALIZER.deserialize(text);
+        return ChatColors.format(text);
     }
 
     private static String nz(final String s) {
