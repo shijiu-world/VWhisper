@@ -154,7 +154,10 @@ sender = "&8[&7我 &8→ &7#target#&8]&r #message#"     # 消息不带颜色 →
 
 ⚠️ 裸 hex **只认 6 位**：3 位的 `#666` 不解析 —— 中文聊天里「666」是高频网络用语，
 当成颜色会把这三个字吃掉。要简写请写 `&#F00`（带 `&` 本来就没歧义，照旧支持）。
-裸 hex 后面紧跟 hex 字符时也不认（`#FF0000AA`、`#1234567` 整段当普通文本）。
+
+📌 后面可以直接跟数字 / 字母：`#00ff001` = 绿色的「1」。v1.3.1 起才这样 ——
+早期版本为了躲开 `#FF0000AA`（8 位带 alpha）加了「后面不能跟 hex 字符」的限制，
+结果把玩家真正会打的 `#00ff001` 一起挡掉了，现在一律按「前 6 位是颜色、剩下的是文字」处理。
 
 > 没有称号/前缀/`%xxx%` 之类的占位符：私聊是代理绕过子服直接发的，子服的 PlaceholderAPI
 > 变量在代理端拿不到，硬要就要额外装 PAPIProxyBridge 并多一次跨服往返 —— 不值。
@@ -305,7 +308,7 @@ cd D:\Code\mc\plugins\VWhisper
 JAVA_HOME=D:/Code/Java/zulu25.34.17-ca-jdk25.0.3-win_x64 mvn -B -o clean package
 ```
 
-产物：`target/vwhisper-1.3.0.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
+产物：`target/vwhisper-1.3.1.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
 
 > 构建为什么必须零依赖：本机 Maven 是离线的，装不上 maven-shade 插件，打不进第三方库，
 > 所以连 TOML 解析都是自己写的（`TomlLite`，~300 行，格式写错也只是取到默认值，不会把插件搞挂）。

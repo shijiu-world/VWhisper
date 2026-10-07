@@ -89,7 +89,9 @@ public class SmokeTest {
         check("{#FF0000} 不被裸 hex 插一脚", ChatColors.normalize("{#FF0000}红").equals("&#FF0000红"));
         check("3 位裸 hex 不认（#666 是网络用语）",
                 ChatColors.normalize("打得好 #666").equals("打得好 #666"));
-        check("8 位带 alpha 不认", ChatColors.normalize("#FF0000AA").equals("#FF0000AA"));
+        // 玩家真实写法：颜色码后面直接跟数字（早期版本的尾部断言把它挡掉了）
+        check("裸 hex 后跟数字", ChatColors.normalize("#00ff001").equals("&#00ff001"));
+        check("裸 hex 后跟字母", ChatColors.normalize("#FF0000abc").equals("&#FF0000abc"));
         check("strip 模式也摘掉裸 hex", letPlain(ChatColors.component("strip", "#FF0000红")).equals("红"));
         check("strip 不误伤 #666", letPlain(ChatColors.component("strip", "打得好 #666")).equals("打得好 #666"));
         check("strip 模式删干净", letPlain(ChatColors.component("strip", "&c红&#FF0000色")).equals("红色"));

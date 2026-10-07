@@ -66,12 +66,17 @@ public final class ChatColors {
      *       更长的串不是颜色码，整段留给纯文本，别吃掉前 6 位再漏一个尾巴。</li>
      * </ul>
      *
+     * <p>📌 <b>尾部刻意不加 {@code (?![0-9a-fA-F])}</b>：早期版本加过，用来防 {@code #FF0000AA}
+     * （8 位带 alpha）。但代价是 {@code #00ff001}「绿字 1」这类<b>颜色码后面直接跟数字 / 字母</b>
+     * 的写法全部失效 —— 而这才是玩家真正会打出来的写法（实测客户端日志里全是 {@code #00ff001}、
+     * {@code #FF00001}）。MC 只支持 6 位 RGB，7 位以上的纯 hex 串在聊天里几乎不会出现。
+     *
      * <p>⚠️ 只认 6 位，故意不支持裸的 {@code #RGB}：中文聊天里 {@code #666}「666」是高频网络用语，
      * 3 位裸 hex 的误伤率太高。带 {@code &} 的 {@code &#F00} 本来就不歧义，照旧支持。
      * 📌 与 Vmessage 的 {@code ChatColors} 同源，改语法两边都要改。
      */
     private static final Pattern BARE_HEX_6 =
-            Pattern.compile("(?<![&§{])#([0-9a-fA-F]{6})(?![0-9a-fA-F])");
+            Pattern.compile("(?<![&§{])#([0-9a-fA-F]{6})");
 
     /** strip 模式要摘掉的全部标记，按最长优先排列 */
     private static final Pattern STRIP = Pattern.compile(
@@ -84,7 +89,8 @@ public final class ChatColors {
                     + "|\\{#[A-Za-z0-9_]*\\}"                 // {#RRGGBB} {#RGB}
                     // ⚠️ 裸 hex 一定放最后：前面那些带 & / {} 的写法必须先被吃掉，
                     //    否则 #FF0000 会被当成裸色先摘掉，留下一个孤零零的 & 或 {
-                    + "|(?<![&§{])#[0-9a-fA-F]{6}(?![0-9a-fA-F])");
+                    // 📌 与 BARE_HEX_6 保持一致：尾部不限制后面跟什么，#00ff001 也要能摘
+                    + "|(?<![&§{])#[0-9a-fA-F]{6}");
 
     private ChatColors() {
     }
