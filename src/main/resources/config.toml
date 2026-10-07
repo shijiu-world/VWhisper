@@ -48,6 +48,16 @@ allow-self-message = true
 #   keep  = 原样保留（会把 &c 原样显示出来）
 # ⚠️ 有 vwhisper.msg.color 权限的玩家，不管这里配什么都按 parse 处理。
 # ⚠️ 渐变不单独设权限 —— 能用颜色就能用渐变。
+#
+# parse 支持的写法（对齐 CMI/CMILib）：
+#   &4  &c  &l  &r ...        传统 16 色 + k/l/m/n/o/r
+#   &#FF0000  &#F00           hex（3 位会自动展开成 6 位）
+#   #FF0000                   裸 hex —— 前面不写 & 也认（只认 6 位；
+#                             3 位的 #666 会被当成网络用语放过，想用简写请写 &#F00）
+#   &x&F&F&0&0&0&0            1.16 原生 hex 写法，会转成 &#FF0000
+#   {#FF0000}  {#F00}         CMI 的花括号 hex
+#   {#FF0000>}文字{#0000FF<}  渐变
+#   {@字体}                   自定义字体 —— 无法实现，忽略
 # ------------------------------------------------------------
 [colors]
 mode = "parse"
@@ -104,7 +114,7 @@ enabled = true
 prefix = "&8[&6#server#&8] "
 hover = "&e发送时间: &6{time}"
 # suggest 末尾留一个空格，玩家点完接着就能输入内容
-suggest = " /msg{player} "
+suggest = " /msg {player} "
 copy = true
 copy-hover = "&7复制该文本"
 

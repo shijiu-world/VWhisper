@@ -710,8 +710,8 @@ public class ServiceTest {
         check("  悬停里的 {time} 是 时:分:秒", bobHover != null && HMS.matcher(bobHover).find());
         check("  #server# 换成了**发送者**所在服（不是收件人的）",
                 bobHover != null && bobHover.contains("[survival]") && !bobHover.contains("[industry]"));
-        check("  点一下填的是「 /msg 发送者 」", " /msgAlice ".equals(clickOf(gotByBob)));
-        check("发送者自己那份填的是「 /msg 收件人 」", " /msgBob ".equals(clickOf(alice.last())));
+        check("  点一下填的是「 /msg 发送者 」", " /msg Alice ".equals(clickOf(gotByBob)));
+        check("发送者自己那份填的是「 /msg 收件人 」", " /msg Bob ".equals(clickOf(alice.last())));
         check("正文点一下复制的是消息原文", "你好啊".equals(findCopy(gotByBob)));
         check("  正文的悬停是「复制该文本」", "复制该文本".equals(hoverOf(copyNode(gotByBob))));
 
@@ -726,7 +726,7 @@ public class ServiceTest {
         store.setSpying(watcher2.uuid, true);
         watcher2.clear();
         service.send(alice.source, "Bob", "被围观");
-        check("窥屏那份点一下填的是「 /msg 发送者 」", " /msgAlice ".equals(clickOf(watcher2.last())));
+        check("窥屏那份点一下填的是「 /msg 发送者 」", " /msg Alice ".equals(clickOf(watcher2.last())));
         check("  窥屏那份的正文字样也在", "被围观".equals(findCopy(watcher2.last())));
         store.setSpying(watcher2.uuid, false);
 

@@ -100,7 +100,7 @@ r = "reply"
 | --- | --- |
 | `vwhisper.spy` | 窥屏开关 |
 | `vwhisper.reload` | 重载配置 |
-| `vwhisper.msg.color` | 私聊内容里可以用颜色码（`&c`、`&#FF0000`、渐变）—— **渐变不单独设权限** |
+| `vwhisper.msg.color` | 私聊内容里可以用颜色码（`&c`、`&#FF0000`、`#FF0000`、渐变）—— **渐变不单独设权限** |
 | `vwhisper.spy.bypass` | 自己的私聊不让窥屏看到 |
 | `vwhisper.toggle.bypass` | 能发给关了私聊的人 |
 | `vwhisper.ignore.bypass` | 能发给把自己屏蔽了的人 |
@@ -139,6 +139,22 @@ sender = "&8[&7我 &8→ &7#target#&8]&r #message#"     # 消息不带颜色 →
 - 颜色码后面哪怕一个字都没有（`&7#message#`）也一样有效 —— 不用为了生效硬塞个空格。
 - 装饰（`&l` `&o`…）跟着一起带过去。
 - 想让消息回到客户端默认色，就在 `#message#` 前留一个 `&r`（有空格也行），别再跟颜色码。
+
+#### 玩家能写哪些颜色语法（`[colors].mode = "parse"` 时）
+
+| 写法 | 例子 |
+|---|---|
+| 传统 16 色 + 格式码 | `&4` `&c` `&l` `&r` |
+| hex | `&#FF0000`、`&#F00`（3 位自动展开成 6 位） |
+| 裸 hex（不带 `&`） | `#FF0000` —— 与 `&#FF0000` 完全等价 |
+| 1.16 原生 hex | `&x&F&F&0&0&0&0` → `&#FF0000` |
+| CMI 花括号 hex | `{#FF0000}` `{#F00}` |
+| 渐变 | `{#FF0000>}文字{#0000FF<}` |
+| 自定义字体 | `{@字体}` —— 无法实现，忽略 |
+
+⚠️ 裸 hex **只认 6 位**：3 位的 `#666` 不解析 —— 中文聊天里「666」是高频网络用语，
+当成颜色会把这三个字吃掉。要简写请写 `&#F00`（带 `&` 本来就没歧义，照旧支持）。
+裸 hex 后面紧跟 hex 字符时也不认（`#FF0000AA`、`#1234567` 整段当普通文本）。
 
 > 没有称号/前缀/`%xxx%` 之类的占位符：私聊是代理绕过子服直接发的，子服的 PlaceholderAPI
 > 变量在代理端拿不到，硬要就要额外装 PAPIProxyBridge 并多一次跨服往返 —— 不值。
@@ -267,7 +283,7 @@ allow-self-message = true    # false = 敲 /msg 自己会提示 messages.self-me
 - **LuckPerms**：不是硬依赖，权限判定走 Velocity 原生的 `CommandSource#getPermissionValue`，
   谁提供权限都不影响（通常就是 LuckPerms）。
 - **整套零第三方依赖**：jar 里不放任何库（本机 Maven 离线，也 shade 不进去），
-  颜色（`&c` / `&#RRGGBB` / CMI 的花括号写法 / 渐变）是自己写的解析器，不引 PAPI、不引 mini。
+  颜色（`&c` / `&#RRGGBB` / 裸 `#RRGGBB` / CMI 的花括号写法 / 渐变）是自己写的解析器，不引 PAPI、不引 mini。
   ⚠️ 但「零依赖」不等于不会 `NoClassDefFoundError` —— 见下面的血泪教训。
 
 ## 已知边界
@@ -289,7 +305,7 @@ cd D:\Code\mc\plugins\VWhisper
 JAVA_HOME=D:/Code/Java/zulu25.34.17-ca-jdk25.0.3-win_x64 mvn -B -o clean package
 ```
 
-产物：`target/vwhisper-1.2.2.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
+产物：`target/vwhisper-1.3.0.jar`（Java 17 / class 61，Velocity 3.4+ ~ 4.x 通用）。
 
 > 构建为什么必须零依赖：本机 Maven 是离线的，装不上 maven-shade 插件，打不进第三方库，
 > 所以连 TOML 解析都是自己写的（`TomlLite`，~300 行，格式写错也只是取到默认值，不会把插件搞挂）。
@@ -316,7 +332,7 @@ $out = "D:\tmp\vwtest"
 
 | 测试 | 断言 | 覆盖 |
 |---|---|---|
-| `SmokeTest` | 56 | TOML 解析、颜色/渐变渲染（**要传 `target/classes/config.toml` 作 `args[0]`**） |
+| `SmokeTest` | 64 | TOML 解析、颜色/渐变渲染（含**裸 hex `#RRGGBB`** 8 条）（**要传 `target/classes/config.toml` 作 `args[0]`**） |
 | `ServiceTest` | 105 | 动态代理桩掉 Velocity API，跑真实 `WhisperService`/`MsgCommand`：权限闸门、接收开关、屏蔽、窥屏、冷却、颜色权限、服务器名单、Tab 补全、**悬停/点击（`[Tooltip]` 两档）**、**提示音三档（含老配置升级兜底）** |
 | `ClasspathTest` | 3 | 运行环境校验，见下 |
 

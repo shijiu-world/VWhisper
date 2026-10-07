@@ -82,6 +82,16 @@ public class SmokeTest {
         check("字体标记摘掉", ChatColors.normalize("{@uniform}字").equals("字"));
         check("孤立渐变尾巴摘掉", ChatColors.normalize("哈{#FF0000<}").equals("哈"));
         check("孤立渐变起始退化成单色", ChatColors.normalize("{#FF0000>}红字").equals("&#ff0000红字"));
+        // ---- 裸 hex（#RRGGBB，前面不带 &）----
+        check("裸 hex -> & 码", ChatColors.normalize("#FF0000红").equals("&#FF0000红"));
+        check("裸 hex 小写也认", ChatColors.normalize("#ff0000红").equals("&#ff0000红"));
+        check("&#FF0000 不被二次加 &", ChatColors.normalize("&#FF0000红").equals("&#FF0000红"));
+        check("{#FF0000} 不被裸 hex 插一脚", ChatColors.normalize("{#FF0000}红").equals("&#FF0000红"));
+        check("3 位裸 hex 不认（#666 是网络用语）",
+                ChatColors.normalize("打得好 #666").equals("打得好 #666"));
+        check("8 位带 alpha 不认", ChatColors.normalize("#FF0000AA").equals("#FF0000AA"));
+        check("strip 模式也摘掉裸 hex", letPlain(ChatColors.component("strip", "#FF0000红")).equals("红"));
+        check("strip 不误伤 #666", letPlain(ChatColors.component("strip", "打得好 #666")).equals("打得好 #666"));
         check("strip 模式删干净", letPlain(ChatColors.component("strip", "&c红&#FF0000色")).equals("红色"));
         check("keep 模式原样显示", letPlain(ChatColors.component("keep", "&c红")).equals("&c红"));
         final Component parsed = ChatColors.component("parse", "&c红");
